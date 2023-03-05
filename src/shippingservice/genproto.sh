@@ -19,6 +19,8 @@
 PATH=$PATH:$GOPATH/bin
 protodir=../../pb
 
-protoc --go_out=plugins=grpc:genproto -I $protodir $protodir/demo.proto
+protoc --go_out=./genproto --go_opt=paths=source_relative \
+  --go-grpc_out=./genproto --go-grpc_opt=paths=source_relative \
+  -I $protodir $protodir/demo.proto
 
 # [END gke_shippingservice_genproto]

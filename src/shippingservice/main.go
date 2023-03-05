@@ -15,6 +15,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -28,6 +29,9 @@ import (
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+
 	pb "github.com/GoogleCloudPlatform/microservices-demo/src/shippingservice/genproto"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
@@ -37,6 +41,51 @@ const (
 )
 
 var log *logrus.Logger
+
+type ShippingStatus int
+
+const (
+	ShippingOpen ShippingStatus = iota
+	ShippingScheduled
+	ShippingInProgress
+	ShippingCompleted
+)
+
+func (ss ShippingStatus) String() string {
+	switch ss {
+	case 0:
+		return "Open"
+	case 1:
+		return "Scheduled"
+	case 2:
+		return "In Progress"
+	case 3:
+		return "Completed"
+	default:
+		return "Unknown"
+	}
+}
+
+type ShippingAddress struct {
+	StreetAddress string
+	City          string
+	State         string
+	Country       string
+	ZipCode       int32
+}
+
+type ShippingOrder struct {
+	gorm.Model
+	ID      string
+	Address ShippingAddress `gorm:"embedded;embeddedPrefix:address_"`
+	Status  ShippingStatus
+}
+
+// server controls RPC service responses.
+type server struct {
+	pb.UnimplementedShippingServiceServer
+	db *gorm.DB
+}
 
 func init() {
 	log = logrus.New()
@@ -87,7 +136,18 @@ func main() {
 		log.Info("Stats disabled.")
 		srv = grpc.NewServer()
 	}
-	svc := &server{}
+
+	dbUrl := "test.db"
+	db, err := gorm.Open(sqlite.Open(dbUrl), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("failed to connect database @ %s", dbUrl)
+	}
+	db.AutoMigrate(&ShippingOrder{})
+
+	svc := &server{
+		db: db,
+	}
+
 	pb.RegisterShippingServiceServer(srv, svc)
 	healthpb.RegisterHealthServer(srv, svc)
 	log.Infof("Shipping Service listening on port %s", port)
@@ -98,9 +158,6 @@ func main() {
 		log.Fatalf("failed to serve: %v", err)
 	}
 }
-
-// server controls RPC service responses.
-type server struct{}
 
 // Check is for health checking.
 func (s *server) Check(ctx context.Context, req *healthpb.HealthCheckRequest) (*healthpb.HealthCheckResponse, error) {
@@ -135,12 +192,72 @@ func (s *server) ShipOrder(ctx context.Context, in *pb.ShipOrderRequest) (*pb.Sh
 	log.Info("[ShipOrder] received request")
 	defer log.Info("[ShipOrder] completed request")
 	// 1. Create a Tracking ID
-	baseAddress := fmt.Sprintf("%s, %s, %s", in.Address.StreetAddress, in.Address.City, in.Address.State)
+	baseAddress := fmt.Sprintf(
+		"%s, %s, %s",
+		in.Address.StreetAddress,
+		in.Address.City,
+		in.Address.State)
 	id := CreateTrackingId(baseAddress)
+
+	s.db.Create(&ShippingOrder{
+		ID:     id,
+		Status: ShippingOpen,
+		Address: ShippingAddress{
+			StreetAddress: in.Address.StreetAddress,
+			City:          in.Address.City,
+			State:         in.Address.State,
+			Country:       in.Address.Country,
+			ZipCode:       in.Address.ZipCode,
+		},
+	})
 
 	// 2. Generate a response.
 	return &pb.ShipOrderResponse{
 		TrackingId: id,
+	}, nil
+}
+
+func (s *server) TrackOrder(ctx context.Context, in *pb.TrackShipOrderRequest) (*pb.TrackShipOrderResponse, error) {
+	shippingOrder := ShippingOrder{
+		ID: in.TrackingId,
+	}
+	s.db.First(&shippingOrder)
+	return &pb.TrackShipOrderResponse{
+		TrackingId: shippingOrder.ID,
+		Status:     shippingOrder.Status.String(),
+		Address: &pb.Address{
+			StreetAddress: shippingOrder.Address.StreetAddress,
+			City:          shippingOrder.Address.City,
+			State:         shippingOrder.Address.State,
+			Country:       shippingOrder.Address.Country,
+			ZipCode:       shippingOrder.Address.ZipCode,
+		},
+	}, nil
+}
+
+func (s *server) UpdateOrderShippingStatus(ctx context.Context, in *pb.UpdateShipOrderStatusRequest) (*pb.UpdateShipOrderStatusResponse, error) {
+
+	if in.Status < 0 || in.Status > 3 {
+		return &pb.UpdateShipOrderStatusResponse{
+			Success: false,
+		}, fmt.Errorf("Tracking status %d not valid", in.Status)
+	}
+
+	shippingOrder := ShippingOrder{
+		ID: in.TrackingId,
+	}
+	res := s.db.First(&shippingOrder)
+	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+		return &pb.UpdateShipOrderStatusResponse{
+			Success: false,
+		}, fmt.Errorf("Tracking ID %s not found", in.TrackingId)
+	}
+
+	shippingOrder.Status = ShippingStatus(in.Status)
+	s.db.Save(shippingOrder)
+
+	return &pb.UpdateShipOrderStatusResponse{
+		Success: true,
 	}, nil
 }
 
