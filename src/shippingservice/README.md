@@ -13,7 +13,7 @@ Run the following command to restore dependencies to `vendor/` directory:
 From `src/shippingservice`, run:
 
 ```
-docker build ./
+docker build -t gcr.io/cmpt-756-serverful/demo/shippingservice ./
 ```
 
 ## Test

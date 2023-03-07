@@ -14,6 +14,7 @@ require (
 	cloud.google.com/go v0.107.0 // indirect
 	cloud.google.com/go/compute v1.15.1 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
+	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/pprof v0.0.0-20221103000818-d260c55eee4c // indirect
@@ -31,6 +32,7 @@ require (
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.3.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
+	gorm.io/driver/mysql v1.4.7 // indirect
 	gorm.io/driver/sqlite v1.4.4 // indirect
 	gorm.io/gorm v1.24.6 // indirect
 )

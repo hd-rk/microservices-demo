@@ -40,7 +40,7 @@ spec:
               - ALL
           privileged: false
           readOnlyRootFilesystem: true
-        image: gcr.io/google-samples/microservices-demo/shippingservice:v0.5.2
+        image: gcr.io/cmpt-756-serverful/demo/shippingservice@sha256:b0f12f5906617d97505678742e36b9fa7f9de0e5df60257178582fd69d486e7c
         ports:
         - containerPort: 50051
         env:
@@ -48,6 +48,9 @@ spec:
           value: "50051"
         - name: DISABLE_PROFILER
           value: "1"
+        envFrom:
+        - secretRef:
+            name: shipping-db-secret
         readinessProbe:
           periodSeconds: 5
           exec:

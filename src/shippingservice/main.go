@@ -29,7 +29,7 @@ import (
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
 	pb "github.com/GoogleCloudPlatform/microservices-demo/src/shippingservice/genproto"
@@ -117,6 +117,38 @@ func main() {
 		log.Info("Profiling disabled.")
 	}
 
+	var (
+		dbHost     string
+		dbPort     string
+		dbUsername string
+		dbPassword string
+		dbName     string
+		ok         bool
+	)
+	if dbHost, ok = os.LookupEnv("DB_HOST"); !ok {
+		log.Fatal("Missing DB_HOST")
+	}
+	if dbPort, ok = os.LookupEnv("DB_PORT"); !ok {
+		log.Fatal("Missing DB_PORT")
+	}
+	if dbUsername, ok = os.LookupEnv("DB_USERNAME"); !ok {
+		log.Fatal("Missing DB_USERNAME")
+	}
+	if dbPassword, ok = os.LookupEnv("DB_PASSWORD"); !ok {
+		log.Fatal("Missing DB_PASSWORD")
+	}
+	if dbName, ok = os.LookupEnv("DB_NAME"); !ok {
+		log.Fatal("Missing DB_NAME")
+	}
+
+	dbUrl := fmt.Sprintf(
+		"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		dbUsername,
+		dbPassword,
+		dbHost,
+		dbPort,
+		dbName)
+
 	port := defaultPort
 	if value, ok := os.LookupEnv("PORT"); ok {
 		port = value
@@ -137,8 +169,7 @@ func main() {
 		srv = grpc.NewServer()
 	}
 
-	dbUrl := "test.db"
-	db, err := gorm.Open(sqlite.Open(dbUrl), &gorm.Config{})
+	db, err := gorm.Open(mysql.Open(dbUrl), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("failed to connect database @ %s", dbUrl)
 	}
@@ -221,7 +252,10 @@ func (s *server) TrackOrder(ctx context.Context, in *pb.TrackShipOrderRequest) (
 	shippingOrder := ShippingOrder{
 		ID: in.TrackingId,
 	}
-	s.db.First(&shippingOrder)
+	res := s.db.First(&shippingOrder)
+	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("Tracking ID %s not found", in.TrackingId)
+	}
 	return &pb.TrackShipOrderResponse{
 		TrackingId: shippingOrder.ID,
 		Status:     shippingOrder.Status.String(),
@@ -238,9 +272,7 @@ func (s *server) TrackOrder(ctx context.Context, in *pb.TrackShipOrderRequest) (
 func (s *server) UpdateOrderShippingStatus(ctx context.Context, in *pb.UpdateShipOrderStatusRequest) (*pb.UpdateShipOrderStatusResponse, error) {
 
 	if in.Status < 0 || in.Status > 3 {
-		return &pb.UpdateShipOrderStatusResponse{
-			Success: false,
-		}, fmt.Errorf("Tracking status %d not valid", in.Status)
+		return nil, fmt.Errorf("Tracking status %d not valid", in.Status)
 	}
 
 	shippingOrder := ShippingOrder{
@@ -248,9 +280,7 @@ func (s *server) UpdateOrderShippingStatus(ctx context.Context, in *pb.UpdateShi
 	}
 	res := s.db.First(&shippingOrder)
 	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
-		return &pb.UpdateShipOrderStatusResponse{
-			Success: false,
-		}, fmt.Errorf("Tracking ID %s not found", in.TrackingId)
+		return nil, fmt.Errorf("Tracking ID %s not found", in.TrackingId)
 	}
 
 	shippingOrder.Status = ShippingStatus(in.Status)

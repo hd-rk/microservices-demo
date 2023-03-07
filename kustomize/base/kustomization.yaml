@@ -27,3 +27,8 @@ resources:
 - recommendationservice.yaml
 - redis.yaml
 - shippingservice.yaml
+secretGenerator:
+- name: shipping-db-secret
+  type: "Opaque"
+  envs:
+  - secret/shipping.env
