@@ -47,6 +47,7 @@ COPY . .
 
 EXPOSE 8080
 ENTRYPOINT [ "python", "email_server.py" ]
+#ENTRYPOINT [ "celery", "-A", "EmailTask", "Worker", "-l", "info"]
 
 FROM without-grpc-health-probe-bin
 
