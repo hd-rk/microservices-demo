@@ -41,7 +41,7 @@ spec:
               - ALL
           privileged: false
           readOnlyRootFilesystem: true
-        image: gcr.io/google-samples/microservices-demo/emailservice:v0.5.2
+        image: gcr.io/cmpt-756-serverful/demo/emailservice@sha256:83e89e62920a6eea424daed8fcbb81947fda04c9f85ff9957d14f30f650738df
         ports:
         - containerPort: 8080
         env:
