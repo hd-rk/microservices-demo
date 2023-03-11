@@ -72,10 +72,13 @@ class EmailService(BaseEmailService):
         email = request.email
         order = request.order
         try:
-            email_task_handler.send_email.delay(email, order)
+            confirmation = template.render(order=order)
+            email_task_handler\
+                .send_order_confirmation_email\
+                .delay(email, confirmation)
             logger.info("Queued email send task for {}".format(email))
         except Exception as err:
-            print(err.message)
+            logger.warn(err)
             context.set_details("An error occurred when sending the email.")
             context.set_code(grpc.StatusCode.INTERNAL)
             return demo_pb2.Empty()

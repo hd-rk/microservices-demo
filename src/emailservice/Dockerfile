@@ -41,6 +41,7 @@ WORKDIR /email_server
 
 # Grab packages from builder
 COPY --from=builder /usr/local/lib/python3.10/ /usr/local/lib/python3.10/
+COPY --from=builder /usr/local/bin/celery /usr/local/bin/celery
 
 # Add the application
 COPY . .
