@@ -49,10 +49,9 @@ spec:
           value: "8080"
         - name: DISABLE_PROFILER
           value: "1"
-        - name: REDIS_HOST
-          value: "redis-cart"
-        - name: REDIS_PORT
-          value: "6379"
+        envFrom:
+        - secretRef:
+            name: email-secret
         readinessProbe:
           periodSeconds: 5
           exec:
@@ -94,6 +93,8 @@ spec:
     metadata:
       labels:
         app: email-handler
+      annotations:
+        sidecar.istio.io/inject: "false"
     spec:
       serviceAccountName: default
       terminationGracePeriodSeconds: 5
@@ -122,10 +123,9 @@ spec:
         env:
         - name: DISABLE_PROFILER
           value: "1"
-        - name: REDIS_HOST
-          value: "redis-cart"
-        - name: REDIS_PORT
-          value: "6379"
+        envFrom:
+        - secretRef:
+            name: email-secret
         resources:
           requests:
             cpu: 100m
