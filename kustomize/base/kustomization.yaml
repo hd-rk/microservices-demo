@@ -32,3 +32,7 @@ secretGenerator:
   type: "Opaque"
   envs:
   - secret/shipping.env
+- name: email-secret
+  type: "Opaque"
+  envs:
+  - secret/email.env
