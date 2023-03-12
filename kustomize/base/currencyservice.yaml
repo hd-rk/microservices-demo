@@ -76,3 +76,32 @@ spec:
   - name: grpc
     port: 7000
     targetPort: 7000
+---
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: currency-updater
+spec:
+  schedule: "*/5 * * * *"  # Run every 5 minutes
+  concurrencyPolicy: Forbid  # Don't allow concurrent runs
+  successfulJobsHistoryLimit: 3  # Keep 3 successful jobs
+  failedJobsHistoryLimit: 1  # Keep 1 failed job
+  jobTemplate:
+    metadata:
+      labels:
+        app: currency-updater
+    spec:
+      template:
+        spec:
+          containers:
+          - name: currency-updater
+            image: gcr.io/cmpt-756-serverful/demo/currency-cron@sha256:39e4e1f8eaedfb11aa0dfdb360334992c8ac79d32825a6fa0f27d6f6b25da7c0
+            env:
+            - name: DEFAULT_CURRENCY
+              value: EUR
+            - name: CURRENCY_SUPPORT
+              value: "USD,JPY,GBP,TRY,CAD"
+            envFrom:
+            - secretRef:
+                name: currency-secret
+          restartPolicy: OnFailure
