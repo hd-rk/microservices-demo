@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# docker build -f Dockerfile -t gcr.io/cmpt-756-serverful/demo/recommendationservice .
+# docker push gcr.io/cmpt-756-serverful/demo/recommendationservice
+
 FROM python:3.10.8-slim@sha256:49749648f4426b31b20fca55ad854caa55ff59dc604f2f76b57d814e0a47c181 as base
 
 FROM base as builder

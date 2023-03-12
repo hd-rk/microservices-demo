@@ -40,3 +40,7 @@ secretGenerator:
   type: "Opaque"
   envs:
   - secret/email.env
+- name: recommendation-secret
+  type: "Opaque"
+  envs:
+  - secret/recommendation.env

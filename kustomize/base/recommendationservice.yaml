@@ -41,7 +41,7 @@ spec:
               - ALL
           privileged: false
           readOnlyRootFilesystem: true
-        image: gcr.io/google-samples/microservices-demo/recommendationservice:v0.5.2
+        image: gcr.io/cmpt-756-serverful/demo/recommendationservice@sha256:0adaab9a11d815285bf3144c7b223c39735fc23d95e1906f8f88b704bcbbb415
         ports:
         - containerPort: 8080
         readinessProbe:
@@ -59,6 +59,9 @@ spec:
           value: "productcatalogservice:3550"
         - name: DISABLE_PROFILER
           value: "1"
+        envFrom:
+        - secretRef:
+            name: recommendation-secret
         resources:
           requests:
             cpu: 100m
@@ -79,3 +82,35 @@ spec:
   - name: grpc
     port: 8080
     targetPort: 8080
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: recommendation-updater
+spec:
+  schedule: "*/1 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        app: recommendation-updater
+    spec:
+      template:
+        metadata:
+          annotations:
+            sidecar.istio.io/inject: "false"
+        spec:
+          containers:
+          - name: recommendation-updater
+            image: gcr.io/cmpt-756-serverful/demo/recommendationservice@sha256:0adaab9a11d815285bf3144c7b223c39735fc23d95e1906f8f88b704bcbbb415
+            env:
+            - name: ROLE
+              value: updater
+            - name: PRODUCT_CATALOG_SERVICE_ADDR
+              value: "productcatalogservice:3550"
+            envFrom:
+            - secretRef:
+                name: recommendation-secret
+          restartPolicy: Never
