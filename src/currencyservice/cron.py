@@ -19,18 +19,22 @@ payload = {
 }
 
 for currency in CURRENCY_SUPPORT:
-    response = requests.get(
-        "https://www.alphavantage.co/query",
-        params={
-            "function": "CURRENCY_EXCHANGE_RATE",
-            "from_currency": DEFAULT_CURRENCY,
-            "to_currency": currency,
-            "api_key": APIKEY
-        })
-    response_dict = response.json()
-    first_key = list(response_dict)[0]
-    fifth_key = list(response_dict[first_key])[4]
-    payload[currency] = response_dict[first_key][fifth_key]
+    try:
+        response = requests.get(
+            url="https://www.alphavantage.co/query",
+            params={
+                "function": "CURRENCY_EXCHANGE_RATE",
+                "from_currency": DEFAULT_CURRENCY,
+                "to_currency": currency,
+                "apikey": APIKEY
+            })
+        response_dict = response.json()
+        first_key = list(response_dict)[0]
+        fifth_key = list(response_dict[first_key])[4]
+        payload[currency] = response_dict[first_key][fifth_key]
+        print(f"{DEFAULT_CURRENCY}=>{currency} : {payload[currency]}")
+    except Exception as err:
+        print(err)
     # r.set(DEFAULT_CURRENCY+'_'+currency, response_dict[first_key][fifth_key])
     
     # response = requests.get(f'https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency={currency}&to_currency={DEFAULT_CURRENCY}&apikey=DEO388ZM3UEZ34M8')

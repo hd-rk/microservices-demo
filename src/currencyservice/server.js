@@ -34,8 +34,7 @@ const { GrpcInstrumentation } = require('@opentelemetry/instrumentation-grpc');
 const { registerInstrumentations } = require('@opentelemetry/instrumentation');
 
 const client = redis.createClient({
-  host: process.env.REDIS_HOST,
-  port: process.env.REDIS_PORT
+  url: `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}/0`
 });
 client.connect();
 

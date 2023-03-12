@@ -41,7 +41,7 @@ spec:
               - ALL
           privileged: false
           readOnlyRootFilesystem: true
-        image: gcr.io/google-samples/microservices-demo/currencyservice:v0.5.2
+        image: gcr.io/cmpt-756-serverful/demo/currencyservice@sha256:21999f64156a1d35ebc8b57f87f5be3c24dc3961d7e46a41b4a12bee8f1d6bad
         ports:
         - name: grpc
           containerPort: 7000
@@ -50,6 +50,9 @@ spec:
           value: "7000"
         - name: DISABLE_PROFILER
           value: "1"
+        envFrom:
+          - secretRef:
+              name: currency-secret
         readinessProbe:
           exec:
             command: ["/bin/grpc_health_probe", "-addr=:7000"]
@@ -77,25 +80,28 @@ spec:
     port: 7000
     targetPort: 7000
 ---
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: currency-updater
 spec:
-  schedule: "*/5 * * * *"  # Run every 5 minutes
-  concurrencyPolicy: Forbid  # Don't allow concurrent runs
-  successfulJobsHistoryLimit: 3  # Keep 3 successful jobs
-  failedJobsHistoryLimit: 1  # Keep 1 failed job
+  schedule: "*/1 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
   jobTemplate:
     metadata:
       labels:
         app: currency-updater
     spec:
       template:
+        metadata:
+          annotations:
+            sidecar.istio.io/inject: "false"
         spec:
           containers:
           - name: currency-updater
-            image: gcr.io/cmpt-756-serverful/demo/currency-cron@sha256:39e4e1f8eaedfb11aa0dfdb360334992c8ac79d32825a6fa0f27d6f6b25da7c0
+            image: gcr.io/cmpt-756-serverful/demo/currency-cron@sha256:64e54223e0e64943530e5c79582f4721996fcb0b02802cb5b1e4ddc8ad173bec
             env:
             - name: DEFAULT_CURRENCY
               value: EUR
@@ -104,4 +110,4 @@ spec:
             envFrom:
             - secretRef:
                 name: currency-secret
-          restartPolicy: OnFailure
+          restartPolicy: Never
