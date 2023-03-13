@@ -13,6 +13,10 @@
 # limitations under the License.
 
 # https://mcr.microsoft.com/v2/dotnet/sdk/tags/list
+
+# docker build -f Dockerfile -t gcr.io/cmpt-756-serverful/demo/cartservice .
+# docker push gcr.io/cmpt-756-serverful/demo/cartservice
+
 FROM mcr.microsoft.com/dotnet/sdk:7.0.201@sha256:bd1ccc2332fc03c6df1659ed125f67f02666f9f188947a80cec4e7afd3c7f98d as builder
 WORKDIR /app
 COPY cartservice.csproj .
@@ -25,9 +29,10 @@ FROM mcr.microsoft.com/dotnet/runtime-deps:7.0.3-alpine3.16-amd64@sha256:0178b1d
 
 WORKDIR /app
 COPY --from=builder /cartservice .
-EXPOSE 7070
+EXPOSE 8080
+ENV PORT=8080
 ENV DOTNET_EnableDiagnostics=0 \
-    ASPNETCORE_URLS=http://*:7070
+    ASPNETCORE_URLS=http://*:${PORT}
 USER 1000
 ENTRYPOINT ["/app/cartservice"]
 
