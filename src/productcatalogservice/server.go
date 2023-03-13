@@ -44,6 +44,10 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var (
@@ -56,6 +60,9 @@ var (
 
 	reloadCatalog bool
 )
+
+// Replace the placeholders with your credentials
+const uri = "mongodb://localhost:64023"
 
 func init() {
 	log = logrus.New()
@@ -73,6 +80,28 @@ func init() {
 	if err != nil {
 		log.Warnf("could not parse product catalog")
 	}
+}
+
+func initDb() {
+	// Use the SetServerAPIOptions() method to set the Stable API version to 1
+	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
+	opts := options.Client().ApplyURI(uri).SetServerAPIOptions(serverAPI)
+	// Create a new client and connect to the server
+	client, err := mongo.Connect(context.TODO(), opts)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err = client.Disconnect(context.TODO()); err != nil {
+			panic(err)
+		}
+	}()
+	// Send a ping to confirm a successful connection
+	var result bson.M
+	if err := client.Database("admin").RunCommand(context.TODO(), bson.D{{"ping", 1}}).Decode(&result); err != nil {
+		panic(err)
+	}
+	fmt.Println("Pinged your deployment. You successfully connected to MongoDB!")
 }
 
 func main() {
@@ -264,6 +293,19 @@ func (p *productCatalog) SearchProducts(ctx context.Context, req *pb.SearchProdu
 	for _, p := range parseCatalog() {
 		if strings.Contains(strings.ToLower(p.Name), strings.ToLower(req.Query)) ||
 			strings.Contains(strings.ToLower(p.Description), strings.ToLower(req.Query)) {
+			ps = append(ps, p)
+		}
+	}
+	return &pb.SearchProductsResponse{Results: ps}, nil
+}
+
+func (p *productCatalog) GetRecommendations(ctx context.Context, req *pb.SearchProductsRequest) (*pb.SearchProductsResponse, error) {
+	time.Sleep(extraLatency)
+	// Intepret query as a substring match in name or description.
+	var ps []*pb.Product
+	for _, p := range parseCatalog() {
+		if strings.Contains(strings.ToLower(p.Name), strings.ToLower(req.Query)) ||
+			strings.Contains(strings.ToLower(p.Description), strings.ToLower(req.Query)) && p.UnitsBought {
 			ps = append(ps, p)
 		}
 	}
