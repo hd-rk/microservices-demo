@@ -24,7 +24,7 @@ resource "google_cloud_run_service" "recommendation" {
     }
     spec {
       containers {
-        image = "gcr.io/google-samples/microservices-demo/recommendationservice:v0.5.2"
+        image = "gcr.io/cmpt-756-serverful/demo/recommendationservice@sha256:0adaab9a11d815285bf3144c7b223c39735fc23d95e1906f8f88b704bcbbb415"
         resources {
           limits = {
             memory = "128Mi"

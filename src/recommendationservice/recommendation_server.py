@@ -89,7 +89,10 @@ class RecommendationService(demo_pb2_grpc.RecommendationServiceServicer):
         if catalog_addr == "":
             raise Exception('PRODUCT_CATALOG_SERVICE_ADDR environment variable not set')
         logger.info("product catalog address: " + catalog_addr)
-        channel = grpc.insecure_channel(catalog_addr)
+        if catalog_addr.endswith(":443"):
+            channel = grpc.secure_channel(catalog_addr, grpc.ssl_channel_credentials())
+        else:
+            channel = grpc.insecure_channel(catalog_addr)
         product_catalog_stub = demo_pb2_grpc.ProductCatalogServiceStub(channel)
         cat_response = product_catalog_stub.ListProducts(demo_pb2.Empty())
         product_ids = [x.id for x in cat_response.products]

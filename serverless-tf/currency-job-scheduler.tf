@@ -1,7 +1,7 @@
 resource "google_cloud_scheduler_job" "exchange-rate-update-scheduler" {
   provider         = google-beta
   name             = "exchange-rate-update-scheduler"
-  schedule         = "*/10 * * * *"
+  schedule         = "0 * * * *"
   attempt_deadline = "60s"
   region           = google_cloud_run_v2_job.update_exchange_rates.location
 
