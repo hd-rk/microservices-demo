@@ -1,7 +1,6 @@
 {
     "products": [
         {
-            "id": "OLJCESPC7Z",
             "name": "Sunglasses",
             "description": "Add a modern touch to your outfits with these sleek aviator sunglasses.",
             "picture": "/static/img/products/sunglasses.jpg",
@@ -10,10 +9,10 @@
                 "units": 19,
                 "nanos": 990000000
             },
-            "categories": ["accessories"]
+            "categories": ["accessories"],
+            "units": 29
         },
         {
-            "id": "66VCHSJNUP",
             "name": "Tank Top",
             "description": "Perfectly cropped cotton tank, with a scooped neckline.",
             "picture": "/static/img/products/tank-top.jpg",
@@ -22,10 +21,10 @@
                 "units": 18,
                 "nanos": 990000000
             },
-            "categories": ["clothing", "tops"]
+            "categories": ["clothing", "tops"],
+            "units": 21
         },
         {
-            "id": "1YMWWN1N4O",
             "name": "Watch",
             "description": "This gold-tone stainless steel watch will work with most of your outfits.",
             "picture": "/static/img/products/watch.jpg",
@@ -34,10 +33,10 @@
                 "units": 109,
                 "nanos": 990000000
             },
-            "categories": ["accessories"]
+            "categories": ["accessories"],
+            "units": 47
         },
         {
-            "id": "L9ECAV7KIM",
             "name": "Loafers",
             "description": "A neat addition to your summer wardrobe.",
             "picture": "/static/img/products/loafers.jpg",
@@ -46,10 +45,10 @@
                 "units": 89,
                 "nanos": 990000000
             },
-            "categories": ["footwear"]
+            "categories": ["footwear"],
+            "units": 53
         },
         {
-            "id": "2ZYFJ3GM2N",
             "name": "Hairdryer",
             "description": "This lightweight hairdryer has 3 heat and speed settings. It's perfect for travel.",
             "picture": "/static/img/products/hairdryer.jpg",
@@ -58,10 +57,10 @@
                 "units": 24,
                 "nanos": 990000000
             },
-            "categories": ["hair", "beauty"]
+            "categories": ["hair", "beauty"],
+            "units": 40
         },
         {
-            "id": "0PUK6V6EV0",
             "name": "Candle Holder",
             "description": "This small but intricate candle holder is an excellent gift.",
             "picture": "/static/img/products/candle-holder.jpg",
@@ -70,10 +69,10 @@
                 "units": 18,
                 "nanos": 990000000
             },
-            "categories": ["decor", "home"]
+            "categories": ["decor", "home"],
+            "units": 34
         },
         {
-            "id": "LS4PSXUNUM",
             "name": "Salt & Pepper Shakers",
             "description": "Add some flavor to your kitchen.",
             "picture": "/static/img/products/salt-and-pepper-shakers.jpg",
@@ -82,10 +81,10 @@
                 "units": 18,
                 "nanos": 490000000
             },
-            "categories": ["kitchen"]
+            "categories": ["kitchen"],
+            "units": 76
         },
         {
-            "id": "9SIQT8TOJO",
             "name": "Bamboo Glass Jar",
             "description": "This bamboo glass jar can hold 57 oz (1.7 l) and is perfect for any kitchen.",
             "picture": "/static/img/products/bamboo-glass-jar.jpg",
@@ -94,10 +93,10 @@
                 "units": 5,
                 "nanos": 490000000
             },
-            "categories": ["kitchen"]
+            "categories": ["kitchen"],
+            "units": 245
         },
         {
-            "id": "6E92ZMYYFZ",
             "name": "Mug",
             "description": "A simple mug with a mustard interior.",
             "picture": "/static/img/products/mug.jpg",
@@ -106,7 +105,8 @@
                 "units": 8,
                 "nanos": 990000000
             },
-            "categories": ["kitchen"]
+            "categories": ["kitchen"],
+            "units": 200
         }
     ]
 }
