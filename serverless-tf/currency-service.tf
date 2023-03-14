@@ -24,7 +24,7 @@ resource "google_cloud_run_service" "currency" {
     }
     spec {
       containers {
-        image = "gcr.io/google-samples/microservices-demo/currencyservice:v0.5.2"
+        image = "gcr.io/cmpt-756-serverful/demo/currencyservice@sha256:21999f64156a1d35ebc8b57f87f5be3c24dc3961d7e46a41b4a12bee8f1d6bad"
         resources {
           limits = {
             memory = "128Mi"
