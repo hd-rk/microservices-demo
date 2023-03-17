@@ -269,6 +269,8 @@ type ProductCatalogServiceClient interface {
 	ListProducts(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListProductsResponse, error)
 	GetProduct(ctx context.Context, in *GetProductRequest, opts ...grpc.CallOption) (*Product, error)
 	SearchProducts(ctx context.Context, in *SearchProductsRequest, opts ...grpc.CallOption) (*SearchProductsResponse, error)
+	GetRecommendations(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SearchProductsResponse, error)
+	UpdateProductCount(ctx context.Context, in *GetProductRequest, opts ...grpc.CallOption) (*Product, error)
 }
 
 type productCatalogServiceClient struct {
@@ -306,6 +308,24 @@ func (c *productCatalogServiceClient) SearchProducts(ctx context.Context, in *Se
 	return out, nil
 }
 
+func (c *productCatalogServiceClient) GetRecommendations(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SearchProductsResponse, error) {
+	out := new(SearchProductsResponse)
+	err := c.cc.Invoke(ctx, "/hipstershop.ProductCatalogService/GetRecommendations", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *productCatalogServiceClient) UpdateProductCount(ctx context.Context, in *GetProductRequest, opts ...grpc.CallOption) (*Product, error) {
+	out := new(Product)
+	err := c.cc.Invoke(ctx, "/hipstershop.ProductCatalogService/UpdateProductCount", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProductCatalogServiceServer is the server API for ProductCatalogService service.
 // All implementations must embed UnimplementedProductCatalogServiceServer
 // for forward compatibility
@@ -313,6 +333,8 @@ type ProductCatalogServiceServer interface {
 	ListProducts(context.Context, *Empty) (*ListProductsResponse, error)
 	GetProduct(context.Context, *GetProductRequest) (*Product, error)
 	SearchProducts(context.Context, *SearchProductsRequest) (*SearchProductsResponse, error)
+	GetRecommendations(context.Context, *Empty) (*SearchProductsResponse, error)
+	UpdateProductCount(context.Context, *GetProductRequest) (*Product, error)
 	mustEmbedUnimplementedProductCatalogServiceServer()
 }
 
@@ -328,6 +350,12 @@ func (UnimplementedProductCatalogServiceServer) GetProduct(context.Context, *Get
 }
 func (UnimplementedProductCatalogServiceServer) SearchProducts(context.Context, *SearchProductsRequest) (*SearchProductsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SearchProducts not implemented")
+}
+func (UnimplementedProductCatalogServiceServer) GetRecommendations(context.Context, *Empty) (*SearchProductsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRecommendations not implemented")
+}
+func (UnimplementedProductCatalogServiceServer) UpdateProductCount(context.Context, *GetProductRequest) (*Product, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateProductCount not implemented")
 }
 func (UnimplementedProductCatalogServiceServer) mustEmbedUnimplementedProductCatalogServiceServer() {}
 
@@ -396,6 +424,42 @@ func _ProductCatalogService_SearchProducts_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProductCatalogService_GetRecommendations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductCatalogServiceServer).GetRecommendations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/hipstershop.ProductCatalogService/GetRecommendations",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductCatalogServiceServer).GetRecommendations(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProductCatalogService_UpdateProductCount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProductRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductCatalogServiceServer).UpdateProductCount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/hipstershop.ProductCatalogService/UpdateProductCount",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductCatalogServiceServer).UpdateProductCount(ctx, req.(*GetProductRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProductCatalogService_ServiceDesc is the grpc.ServiceDesc for ProductCatalogService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -414,6 +478,14 @@ var ProductCatalogService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SearchProducts",
 			Handler:    _ProductCatalogService_SearchProducts_Handler,
+		},
+		{
+			MethodName: "GetRecommendations",
+			Handler:    _ProductCatalogService_GetRecommendations_Handler,
+		},
+		{
+			MethodName: "UpdateProductCount",
+			Handler:    _ProductCatalogService_UpdateProductCount_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
