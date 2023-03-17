@@ -377,7 +377,36 @@ func (p *productCatalog) GetRecommendations(ctx context.Context, req *pb.SearchP
 		panic(err)
 	}
 
-	return &pb.SearchProductsResponse{Results: ps}, nil
+	return &pb.GetRecommendationsResponse{Results: ps}, nil
+}
+
+func (p *productCatalog) UpdateProductCount(ctx context.Context, req *pb.GetProductRequest) (*pb.Product, error) {
+	time.Sleep(extraLatency)
+	var found *pb.Product
+	var collection *mongo.Collection = connectDb()
+	filter := bson.D{{"_id", req.Id}}
+
+	err := collection.FindOne(context.TODO(), filter).Decode(found)
+	if err != nil {
+		log.Errorf("No documents regarding product catalog were found.")
+		panic(err)
+	}
+	else if found == nil {
+		return nil, status.Errorf(codes.NotFound, "no product with ID %s", req.Id)
+	}
+	document := bson.D{
+		
+    {"name", found.Name},
+    {"description", found.Description},
+    {"picture", found.Picture},
+	{"price_usd", found.PriceUsd},
+    { "categories", found.Categories},
+    {"units", found.Units-1}
+	}
+	update := bson.D{{"$set", document}
+	result, err := collection.UpdateOne(context.TODO(), filter, update)
+
+	return found, nil
 }
 
 func mustMapEnv(target *string, envKey string) {
