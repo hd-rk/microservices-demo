@@ -29,8 +29,15 @@ else {
 
 // Register GRPC OTel Instrumentation for trace propagation
 // regardless of whether tracing is emitted.
+const redis = require('redis');
 const { GrpcInstrumentation } = require('@opentelemetry/instrumentation-grpc');
 const { registerInstrumentations } = require('@opentelemetry/instrumentation');
+
+const client = redis.createClient({
+  url: `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}/0`
+});
+client.connect();
+
 
 registerInstrumentations({
   instrumentations: [new GrpcInstrumentation()]
@@ -97,9 +104,11 @@ function _loadProto (path) {
  * Helper function that gets currency data from a stored JSON file
  * Uses public data from European Central Bank
  */
-function _getCurrencyData (callback) {
-  const data = require('./data/currency_conversion.json');
-  callback(data);
+async function _getCurrencyData (callback) {
+  // const data = require('./data/currency_conversion.json');
+  // callback(data);
+  const value = await client.get('currency_conversion');
+  callback(JSON.parse(value));
 }
 
 /**
@@ -118,7 +127,7 @@ function _carry (amount) {
  */
 function getSupportedCurrencies (call, callback) {
   logger.info('Getting supported currencies...');
-  _getCurrencyData((data) => {
+  _getCurrencyData(async(data) => {
     callback(null, {currency_codes: Object.keys(data)});
   });
 }
@@ -128,7 +137,7 @@ function getSupportedCurrencies (call, callback) {
  */
 function convert (call, callback) {
   try {
-    _getCurrencyData((data) => {
+    _getCurrencyData(async(data) => {
       const request = call.request;
 
       // Convert: from_currency --> EUR

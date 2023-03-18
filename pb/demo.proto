@@ -17,6 +17,7 @@ syntax = "proto3";
 package hipstershop;
 
 option go_package = "./";
+
 // -----------------Cart service-----------------
 
 service CartService {
@@ -117,6 +118,8 @@ message UpdateProductCountResponse {
 service ShippingService {
     rpc GetQuote(GetQuoteRequest) returns (GetQuoteResponse) {}
     rpc ShipOrder(ShipOrderRequest) returns (ShipOrderResponse) {}
+    rpc TrackOrder(TrackShipOrderRequest) returns (TrackShipOrderResponse) {}
+    rpc UpdateOrderShippingStatus(UpdateShipOrderStatusRequest) returns (UpdateShipOrderStatusResponse) {}
 }
 
 message GetQuoteRequest {
@@ -135,6 +138,25 @@ message ShipOrderRequest {
 
 message ShipOrderResponse {
     string tracking_id = 1;
+}
+
+message TrackShipOrderRequest {
+    string tracking_id = 1;
+}
+
+message TrackShipOrderResponse {
+    string tracking_id = 1;
+    string status = 2;
+    Address address = 3;
+}
+
+message UpdateShipOrderStatusRequest {
+    string tracking_id = 1;
+    int32 status = 2;
+}
+
+message UpdateShipOrderStatusResponse {
+    bool success = 1;
 }
 
 message Address {

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# docker build -f Dockerfile -t gcr.io/cmpt-756-serverful/demo/checkoutservice . && docker push gcr.io/cmpt-756-serverful/demo/checkoutservice
+
 FROM golang:1.20.1-alpine@sha256:18da4399cedd9e383beb6b104d43aa1d48bd41167e312bb5306d72c51bd11548 as builder
 RUN apk add --no-cache ca-certificates git
 RUN apk add build-base
