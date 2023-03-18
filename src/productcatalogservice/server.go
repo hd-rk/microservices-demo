@@ -23,7 +23,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -61,9 +60,6 @@ var (
 	reloadCatalog bool
 )
 
-// Replace the placeholders with your credentials
-const uri = "mongodb://localhost:65469"
-
 func init() {
 	log = logrus.New()
 	log.Formatter = &logrus.JSONFormatter{
@@ -82,22 +78,27 @@ func init() {
 	}
 }
 
-func connectDb() *mongo.Collection {
+func connectDb(ctx context.Context, serverUri string) (*mongo.Collection, error) {
 
 	// Use the SetServerAPIOptions() method to set the Stable API version to 1
 	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
-	opts := options.Client().ApplyURI(uri).SetServerAPIOptions(serverAPI)
+	opts := options.Client().ApplyURI(serverUri).SetServerAPIOptions(serverAPI)
 
 	// Create a new client and connect to the server
-	client, err := mongo.Connect(context.TODO(), opts)
+	client, err := mongo.Connect(ctx, opts)
 
 	if err != nil {
 		log.Errorf("Failed to connect to MongoDB")
-		panic(err)
+		return nil, err
 	}
 
-	var collect *mongo.Collection = client.Database("product_catalog").Collection("products")
-	return collect
+	collection := client.Database("product_catalog").Collection("products")
+	return collection, nil
+}
+
+type productCatalog struct {
+	pb.UnimplementedProductCatalogServiceServer
+	productColl *mongo.Collection
 }
 
 func main() {
@@ -147,15 +148,17 @@ func main() {
 		}
 	}()
 
+	mongdoUri := "mongodb://localhost:65469"
+
 	if os.Getenv("PORT") != "" {
 		port = os.Getenv("PORT")
 	}
 	log.Infof("starting grpc server at :%s", port)
-	run(port)
+	run(port, mongdoUri)
 	select {}
 }
 
-func run(port string) string {
+func run(port, mongoDBUri string) string {
 	l, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
 		log.Fatal(err)
@@ -169,7 +172,12 @@ func run(port string) string {
 		grpc.UnaryInterceptor(otelgrpc.UnaryServerInterceptor()),
 		grpc.StreamInterceptor(otelgrpc.StreamServerInterceptor()))
 
-	svc := &productCatalog{}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	collection, err := connectDb(ctx, mongoDBUri)
+	svc := &productCatalog{
+		productColl: collection,
+	}
 
 	pb.RegisterProductCatalogServiceServer(srv, svc)
 	healthpb.RegisterHealthServer(srv, svc)
@@ -227,8 +235,6 @@ func initProfiling(service, version string) {
 	log.Warn("could not initialize Stackdriver profiler after retrying, giving up")
 }
 
-type productCatalog struct{}
-
 func readCatalogFile(catalog *pb.ListProductsResponse) error {
 	catalogMutex.Lock()
 	defer catalogMutex.Unlock()
@@ -263,17 +269,16 @@ func (p *productCatalog) Watch(req *healthpb.HealthCheckRequest, ws healthpb.Hea
 	return status.Errorf(codes.Unimplemented, "health check via Watch not implemented")
 }
 
-func (p *productCatalog) ListProducts(context.Context, *pb.Empty) (*pb.ListProductsResponse, error) {
+func (p *productCatalog) ListProducts(ctx context.Context, req *pb.Empty) (*pb.ListProductsResponse, error) {
 	time.Sleep(extraLatency)
 	var ps []*pb.Product
-	var collection *mongo.Collection = connectDb()
-	cursor, err := collection.Find(context.TODO(), bson.D{})
+	cursor, err := p.productColl.Find(ctx, bson.D{})
 	if err != nil {
 		log.Errorf("No documents regarding product catalog were found.")
 		panic(err)
 	}
 
-	if err = cursor.All(context.TODO(), ps); err != nil {
+	if err = cursor.All(ctx, ps); err != nil {
 		log.Errorf("Couldn't retrieve the products")
 		panic(err)
 	}
@@ -285,15 +290,14 @@ func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductReque
 	time.Sleep(extraLatency)
 	var found *pb.Product
 	// for i := 0; i < len(parseCatalog()); i++ {
-	// 	if req.Id == parseCatalog()[i].Id {
-	// 		found = parseCatalog()[i]
-	// 	}
+	//  if req.Id == parseCatalog()[i].Id {
+	//    found = parseCatalog()[i]
+	//  }
 	// }
 	// if found == nil {
-	// 	return nil, status.Errorf(codes.NotFound, "no product with ID %s", req.Id)
+	//  return nil, status.Errorf(codes.NotFound, "no product with ID %s", req.Id)
 	// }
-	var collection *mongo.Collection = connectDb()
-	err := collection.FindOne(context.TODO(), bson.D{{"id", req.Id}}).Decode(found)
+	err := p.productColl.FindOne(ctx, bson.D{{"id", req.Id}}).Decode(found)
 	if err != nil {
 		log.Errorf("No documents regarding product catalog were found.")
 		panic(err)
@@ -310,34 +314,34 @@ func (p *productCatalog) SearchProducts(ctx context.Context, req *pb.SearchProdu
 	// Intepret query as a substring match in name or description.
 	var ps []*pb.Product
 	// for _, p := range parseCatalog() {
-	// 	if strings.Contains(strings.ToLower(p.Name), strings.ToLower(req.Query)) ||
-	// 		strings.Contains(strings.ToLower(p.Description), strings.ToLower(req.Query)) {
-	// 		ps = append(ps, p)
-	// 	}
+	//  if strings.Contains(strings.ToLower(p.Name), strings.ToLower(req.Query)) ||
+	//    strings.Contains(strings.ToLower(p.Description), strings.ToLower(req.Query)) {
+	//    ps = append(ps, p)
+	//  }
 	// }
-	var collection *mongo.Collection = connectDb()
+
 	//Create the Text Index to search
 	model := mongo.IndexModel{
 		Keys: bson.D{
 			{"name", -1},
-			{"description", -1}
-		}
+			{"description", -1},
+		},
 	}
-	name, err := collection.Indexes().CreateOne(context.TODO(), model)
+	_, err := p.productColl.Indexes().CreateOne(ctx, model)
 	if err != nil {
 		panic(err)
 	}
 
 	//Perfrom the query
-	
-	filter := bson.D{{"$text", bson.D{{"$search", req.query}}}}
-	cursor, err := collection.Find(context.TODO(), filter)
+
+	filter := bson.D{{"$text", bson.D{{"$search", req.Query}}}}
+	cursor, err := p.productColl.Find(ctx, filter)
 	if err != nil {
 		log.Errorf("No documents regarding product catalog were found.")
 		panic(err)
 	}
 
-	if err = cursor.All(context.TODO(), ps); err != nil {
+	if err = cursor.All(ctx, ps); err != nil {
 		log.Errorf("Couldn't retrieve the products")
 		panic(err)
 	}
@@ -346,66 +350,55 @@ func (p *productCatalog) SearchProducts(ctx context.Context, req *pb.SearchProdu
 	return &pb.SearchProductsResponse{Results: ps}, nil
 }
 
-func (p *productCatalog) GetRecommendations(ctx context.Context, req *pb.SearchProductsRequest) (*pb.SearchProductsResponse, error) {
+func (p *productCatalog) GetRecommendations(ctx context.Context, req *pb.Empty) (*pb.SearchProductsResponse, error) {
 	time.Sleep(extraLatency)
 	// Intepret query as a substring match in name or description.
 	var ps []*pb.Product
 	// for _, p := range parseCatalog() {
-	// 	if strings.Contains(strings.ToLower(p.Name), strings.ToLower(req.Query)) ||
-	// 		strings.Contains(strings.ToLower(p.Description), strings.ToLower(req.Query)) && p.UnitsBought {
-	// 		ps = append(ps, p)
-	// 	}
+	//  if strings.Contains(strings.ToLower(p.Name), strings.ToLower(req.Query)) ||
+	//    strings.Contains(strings.ToLower(p.Description), strings.ToLower(req.Query)) && p.UnitsBought {
+	//    ps = append(ps, p)
+	//  }
 	// }
 
-	var collection *mongo.Collection = connectDb()
-	filter := bson.D{
-		{
-			"$sort": {"units": -1}
-		},
-		{
-			"$limit": 5
-		}
-	}
-	cursor, err := collection.Find(context.TODO(), filter)
+	filter := bson.D{}
+	opts := options.Find().SetSort(bson.D{{"units", -1}}).SetLimit(5)
+	cursor, err := p.productColl.Find(ctx, filter, opts)
 	if err != nil {
 		log.Errorf("No documents regarding product catalog were found.")
 		panic(err)
 	}
 
-	if err = cursor.All(context.TODO(), ps); err != nil {
+	if err = cursor.All(ctx, ps); err != nil {
 		log.Errorf("Couldn't retrieve the products")
 		panic(err)
 	}
 
-	return &pb.GetRecommendationsResponse{Results: ps}, nil
+	return &pb.SearchProductsResponse{Results: ps}, nil
 }
 
 func (p *productCatalog) UpdateProductCount(ctx context.Context, req *pb.GetProductRequest) (*pb.Product, error) {
 	time.Sleep(extraLatency)
 	var found *pb.Product
-	var collection *mongo.Collection = connectDb()
 	filter := bson.D{{"_id", req.Id}}
 
-	err := collection.FindOne(context.TODO(), filter).Decode(found)
+	err := p.productColl.FindOne(ctx, filter).Decode(found)
 	if err != nil {
-		log.Errorf("No documents regarding product catalog were found.")
-		panic(err)
-	}
-	else if found == nil {
+		log.Warnf("Query exception %s", err)
+		return nil, status.Errorf(codes.Internal, "Query exception")
+	} else if found == nil {
 		return nil, status.Errorf(codes.NotFound, "no product with ID %s", req.Id)
 	}
 	document := bson.D{
-		
-    {"name", found.Name},
-    {"description", found.Description},
-    {"picture", found.Picture},
-	{"price_usd", found.PriceUsd},
-    { "categories", found.Categories},
-    {"units", found.Units-1}
+		{"name", found.Name},
+		{"description", found.Description},
+		{"picture", found.Picture},
+		{"price_usd", found.PriceUsd},
+		{"categories", found.Categories},
+		{"units", found.Units - 1},
 	}
-	update := bson.D{{"$set", document}
-	result, err := collection.UpdateOne(context.TODO(), filter, update)
-
+	update := bson.D{{"$set", document}}
+	_, err = p.productColl.UpdateOne(ctx, filter, update)
 	return found, nil
 }
 
