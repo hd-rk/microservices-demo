@@ -148,13 +148,19 @@ func main() {
 		}
 	}()
 
-	mongdoUri := "mongodb://localhost:65469"
+	mongoUri := fmt.Sprintf(
+		"mongodb://%s:%s@%s:%s",
+		getEnv("MONGODB_USERNAME", "username"),
+		getEnv("MONGODB_PASSWORD", "password"),
+		getEnv("MONGODB_HOST", "localhost"),
+		getEnv("MONGODB_PORT", "27017"),
+	)
 
 	if os.Getenv("PORT") != "" {
 		port = os.Getenv("PORT")
 	}
 	log.Infof("starting grpc server at :%s", port)
-	run(port, mongdoUri)
+	run(port, mongoUri)
 	select {}
 }
 
@@ -421,4 +427,11 @@ func mustConnGRPC(ctx context.Context, conn **grpc.ClientConn, addr string) {
 	if err != nil {
 		panic(errors.Wrapf(err, "grpc: failed to connect %s", addr))
 	}
+}
+
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
 }
