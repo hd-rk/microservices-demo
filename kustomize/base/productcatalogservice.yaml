@@ -41,7 +41,7 @@ spec:
               - ALL
           privileged: false
           readOnlyRootFilesystem: true
-        image: gcr.io/google-samples/microservices-demo/productcatalogservice:v0.5.2
+        image: gcr.io/cmpt-756-serverful/demo/productcatalogservice@sha256:7fe788459c284faa637ed9d701a571c552480effae6b8b42ef10faee02da8127
         ports:
         - containerPort: 3550
         env:
@@ -49,6 +49,9 @@ spec:
           value: "3550"
         - name: DISABLE_PROFILER
           value: "1"
+        envFrom:
+        - secretRef:
+            name: productcatalog-secret
         readinessProbe:
           exec:
             command: ["/bin/grpc_health_probe", "-addr=:3550"]
