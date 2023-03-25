@@ -14,29 +14,33 @@
  * limitations under the License.
  */
 
-if(process.env.DISABLE_PROFILER) {
-  console.log("Profiler disabled.")
-}
-else {
-  console.log("Profiler enabled.")
-  require('@google-cloud/profiler').start({
-    serviceContext: {
-      service: 'currencyservice',
-      version: '1.0.0'
-    }
-  });
-}
+// if(process.env.DISABLE_PROFILER) {
+//   console.log("Profiler disabled.")
+// }
+// else {
+//   console.log("Profiler enabled.")
+//   require('@google-cloud/profiler').start({
+//     serviceContext: {
+//       service: 'currencyservice',
+//       version: '1.0.0'
+//     }
+//   });
+// }
 
 // Register GRPC OTel Instrumentation for trace propagation
 // regardless of whether tracing is emitted.
-const redis = require('redis');
+const mysql = require("mysql2");
 const { GrpcInstrumentation } = require('@opentelemetry/instrumentation-grpc');
 const { registerInstrumentations } = require('@opentelemetry/instrumentation');
 
-const client = redis.createClient({
-  url: `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}/0`
+const db = mysql.createPool({
+  host: process.env.MYSQL_HOST,
+  user: process.env.MYSQL_USER,
+  password: process.env.MYSQL_PASSWORD,
+  database: process.env.DATABASE,
+  waitForConnections: true,
 });
-client.connect();
+
 
 
 registerInstrumentations({
@@ -107,8 +111,12 @@ function _loadProto (path) {
 async function _getCurrencyData (callback) {
   // const data = require('./data/currency_conversion.json');
   // callback(data);
-  const value = await client.get('currency_conversion');
-  callback(JSON.parse(value));
+  // const value = await client.get('currency_conversion');
+  
+  const [rows, fields] = await connection.execute('SELECT * FROM currency_conversion');
+  console.log('rows: ', rows);
+  console.log('fields: ', fields);
+  // callback(JSON.parse(value));
 }
 
 /**
@@ -179,7 +187,8 @@ function check (call, callback) {
  * Starts an RPC server that receives requests for the
  * CurrencyConverter service at the sample server port
  */
-function main () {
+async function main () {
+
   logger.info(`Starting gRPC server on port ${PORT}...`);
   const server = new grpc.Server();
   server.addService(shopProto.CurrencyService.service, {getSupportedCurrencies, convert});
