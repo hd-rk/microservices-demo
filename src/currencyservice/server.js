@@ -14,32 +14,32 @@
  * limitations under the License.
  */
 
-// if(process.env.DISABLE_PROFILER) {
-//   console.log("Profiler disabled.")
-// }
-// else {
-//   console.log("Profiler enabled.")
-//   require('@google-cloud/profiler').start({
-//     serviceContext: {
-//       service: 'currencyservice',
-//       version: '1.0.0'
-//     }
-//   });
-// }
+if(process.env.DISABLE_PROFILER) {
+  console.log("Profiler disabled.")
+}
+else {
+  console.log("Profiler enabled.")
+  require('@google-cloud/profiler').start({
+    serviceContext: {
+      service: 'currencyservice',
+      version: '1.0.0'
+    }
+  });
+}
 
 // Register GRPC OTel Instrumentation for trace propagation
 // regardless of whether tracing is emitted.
-const mysql = require("mysql2");
+const mysql = require('mysql2/promise');
 const { GrpcInstrumentation } = require('@opentelemetry/instrumentation-grpc');
 const { registerInstrumentations } = require('@opentelemetry/instrumentation');
 
-const db = mysql.createPool({
-  host: process.env.MYSQL_HOST,
-  user: process.env.MYSQL_USER,
-  password: process.env.MYSQL_PASSWORD,
-  database: process.env.DATABASE,
-  waitForConnections: true,
-});
+// const db = mysql.createPool({
+//   host: process.env.MYSQL_HOST,
+//   user: process.env.MYSQL_USER,
+//   password: process.env.MYSQL_PASSWORD,
+//   database: process.env.DATABASE,
+//   waitForConnections: true,
+// });
 
 
 
@@ -109,14 +109,21 @@ function _loadProto (path) {
  * Uses public data from European Central Bank
  */
 async function _getCurrencyData (callback) {
-  // const data = require('./data/currency_conversion.json');
-  // callback(data);
-  // const value = await client.get('currency_conversion');
-  
+  // create the connection
+  const connection = await mysql.createConnection({
+    host: process.env.MYSQL_HOST,
+    user: process.env.MYSQL_USER,
+    password: process.env.MYSQL_PASSWORD,
+    database: process.env.MYSQL_DATABASE
+  });
+  // query database
   const [rows, fields] = await connection.execute('SELECT * FROM currency_conversion');
-  console.log('rows: ', rows);
-  console.log('fields: ', fields);
-  // callback(JSON.parse(value));
+  payload = {}
+  for(var i in rows){
+    var row = rows[i]
+    payload[row['currency_to']] = row['exchange_rate']
+  }
+  callback(payload);
 }
 
 /**
