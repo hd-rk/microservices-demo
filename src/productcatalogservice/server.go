@@ -22,9 +22,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
 	pb "github.com/GoogleCloudPlatform/microservices-demo/src/productcatalogservice/genproto"
@@ -48,6 +46,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 var (
@@ -145,21 +144,21 @@ func main() {
 		extraLatency = time.Duration(0)
 	}
 
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGUSR1, syscall.SIGUSR2)
-	go func() {
-		for {
-			sig := <-sigs
-			log.Printf("Received signal: %s", sig)
-			if sig == syscall.SIGUSR1 {
-				reloadCatalog = true
-				log.Infof("Enable catalog reloading")
-			} else {
-				reloadCatalog = false
-				log.Infof("Disable catalog reloading")
-			}
-		}
-	}()
+	// sigs := make(chan os.Signal, 1)
+	// signal.Notify(sigs, syscall.SIGUSR1, syscall.SIGUSR2)
+	// go func() {
+	// 	for {
+	// 		sig := <-sigs
+	// 		log.Printf("Received signal: %s", sig)
+	// 		if sig == syscall.SIGUSR1 {
+	// 			reloadCatalog = true
+	// 			log.Infof("Enable catalog reloading")
+	// 		} else {
+	// 			reloadCatalog = false
+	// 			log.Infof("Disable catalog reloading")
+	// 		}
+	// 	}
+	// }()
 
 	// mongodb+srv://demo-user:geer8nqi3AVf@demo-mongodb-svc.mongodb.svc.cluster.local/product_catalog?replicaSet=demo-mongodb&ssl=false&authSource=admin
 	mongoUri := fmt.Sprintf(
@@ -286,6 +285,19 @@ func parseCatalog() []*pb.Product {
 	return cat.Products
 }
 
+func productGPBToMongo(product *pb.Product) *MongoProduct {
+	return &MongoProduct{
+		Name:        product.Name,
+		Description: product.Description,
+		Picture:     product.Picture,
+		PriceUnits:  product.PriceUsd.Units,
+		PriceNanos:  product.PriceUsd.Nanos,
+		Categories:  product.Categories,
+		Units:       product.Units,
+		Sold:        product.Sold,
+	}
+}
+
 func productMongoToGPB(mp *MongoProduct) *pb.Product {
 	return &pb.Product{
 		Id:          mp.ID.Hex(),
@@ -332,12 +344,14 @@ func (p *productCatalog) loadProductIntoMongo() error {
 	}
 
 	models := []mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "name", Value: bsonx.String("text")},
-			{Key: "description", Value: bsonx.String("text")},
+		{
+			Keys: bsonx.Doc{
+				{Key: "name", Value: bsonx.String("text")},
+				{Key: "description", Value: bsonx.String("text")},
+			},
 		},
-		Keys: bsonx.Doc{
-			{Key: "sold", Value: bsonx.Int32(-1)},
+		{
+			Keys: bsonx.Doc{{Key: "sold", Value: bsonx.Int32(-1)}},
 		},
 	}
 	_, err := p.productColl.Indexes().CreateMany(ctx, models)
@@ -451,14 +465,13 @@ func (p *productCatalog) GetRecommendations(ctx context.Context, req *pb.Empty) 
 
 func (p *productCatalog) UpdateProductCount(ctx context.Context, req *pb.UpdateProductCountRequest) (*pb.UpdateProductCountResponse, error) {
 	time.Sleep(extraLatency)
-
-	var found *MongoProduct
+	var found *pb.Product
 	objectId, err := primitive.ObjectIDFromHex(req.GetId())
 	var response *pb.UpdateProductCountResponse
-	response.Id = objectId
+	response.Id = objectId.Hex()
 	filter := bson.D{{"_id", objectId}}
 
-	err := p.productColl.FindOne(ctx, filter).Decode(found)
+	err = p.productColl.FindOne(ctx, filter).Decode(&found)
 	if err != nil {
 		log.Warnf("Query exception %s", err)
 		return nil, status.Errorf(codes.Internal, "Query exception")
@@ -474,7 +487,12 @@ func (p *productCatalog) UpdateProductCount(ctx context.Context, req *pb.UpdateP
 		{"name", found.Name},
 		{"description", found.Description},
 		{"picture", found.Picture},
-		{"price_usd", found.PriceUsd},
+		{"price_usd", bson.D{
+			{"currencyCode", "USD"},
+			{"units", found.PriceUsd.Units},
+			{"nanos", found.PriceUsd.Nanos},
+		},
+		},
 		{"categories", found.Categories},
 		{"units", found.Units - req.GetCount()},
 		{"sold", found.Sold + req.GetCount()},
