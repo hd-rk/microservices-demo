@@ -73,7 +73,7 @@ service ProductCatalogService {
     rpc GetProduct(GetProductRequest) returns (Product) {}
     rpc SearchProducts(SearchProductsRequest) returns (SearchProductsResponse) {}
     rpc GetRecommendations(Empty) returns(SearchProductsResponse){}
-    rpc UpdateProductCount(GetProductRequest) returns(Product){}
+    rpc UpdateProductCount(UpdateProductCountRequest) returns(UpdateProductCountResponse){}
 }
 
 message Product {
@@ -87,6 +87,7 @@ message Product {
     // other related products.
     repeated string categories = 6;
     int32 units = 7;
+    int32 sold = 8;
 }
 
 message ListProductsResponse {
@@ -109,8 +110,13 @@ message GetRecommendationsResponse{
     repeated Product results = 1;
 }
 
-message UpdateProductCountResponse {
-    Product products = 1;
+message UpdateProductCountRequest {
+    string id = 1;
+    int32 count = 2;
+}
+
+message UpdateProductCountResponse{
+    string id = 1;
 }
 
 // ---------------Shipping Service----------

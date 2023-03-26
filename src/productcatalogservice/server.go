@@ -111,6 +111,7 @@ type MongoProduct struct {
 	PriceNanos  int32              `bson:"price_nanos,omitempty"`
 	Categories  []string           `bson:"categories,omitempty"`
 	Units       int32              `bson:"units,omitempty"`
+	Sold        int32              `bson:"sold,omitempty"`
 }
 
 func main() {
@@ -298,6 +299,7 @@ func productMongoToGPB(mp *MongoProduct) *pb.Product {
 		},
 		Categories: mp.Categories,
 		Units:      mp.Units,
+		Sold:       mp.Sold,
 	}
 }
 
@@ -319,6 +321,7 @@ func (p *productCatalog) loadProductIntoMongo() error {
 			PriceNanos:  product.PriceUsd.Nanos,
 			Categories:  product.Categories,
 			Units:       product.Units,
+			Sold:        product.Sold,
 		})
 	}
 	if result, err := p.productColl.InsertMany(context.TODO(), docs); err != nil {
@@ -328,13 +331,17 @@ func (p *productCatalog) loadProductIntoMongo() error {
 		log.Infof("%d inserted to db", len(result.InsertedIDs))
 	}
 
-	model := mongo.IndexModel{
-		Keys: bson.D{
-			{"name", -1},
-			{"description", -1},
+	models := []mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{Key: "name", Value: bsonx.String("text")},
+			{Key: "description", Value: bsonx.String("text")},
+		},
+		Keys: bsonx.Doc{
+			{Key: "sold", Value: bsonx.Int32(-1)},
 		},
 	}
-	_, err := p.productColl.Indexes().CreateOne(ctx, model)
+	_, err := p.productColl.Indexes().CreateMany(ctx, models)
+
 	if err != nil {
 		return err
 	}
@@ -427,7 +434,7 @@ func (p *productCatalog) GetRecommendations(ctx context.Context, req *pb.Empty) 
 	// }
 
 	filter := bson.D{}
-	opts := options.Find().SetSort(bson.D{{"units", -1}}).SetLimit(5)
+	opts := options.Find().SetSort(bson.D{{"sold", -1}}).SetLimit(5)
 	cursor, err := p.productColl.Find(ctx, filter, opts)
 	if err != nil {
 		log.Errorf("No documents regarding product catalog were found.")
