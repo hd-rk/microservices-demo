@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# docker build -f Dockerfile -t gcr.io/cmpt-756-serverful/demo/currencyservice .
-# docker push gcr.io/cmpt-756-serverful/demo/currencyservice
+# docker build -f Dockerfile -t gcr.io/cmpt-756-serverful/demo/currencyservice . && docker push gcr.io/cmpt-756-serverful/demo/currencyservice
 
 
 FROM node:19.7.0-alpine@sha256:51dd437f31812df71108b81385e2945071ec813d5815fa3403855669c8f3432b as base
