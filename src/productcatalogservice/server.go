@@ -449,10 +449,14 @@ func (p *productCatalog) GetRecommendations(ctx context.Context, req *pb.Empty) 
 	return &pb.SearchProductsResponse{Results: ps}, nil
 }
 
-func (p *productCatalog) UpdateProductCount(ctx context.Context, req *pb.GetProductRequest) (*pb.Product, error) {
+func (p *productCatalog) UpdateProductCount(ctx context.Context, req *pb.UpdateProductCountRequest) (*pb.UpdateProductCountResponse, error) {
 	time.Sleep(extraLatency)
-	var found *pb.Product
-	filter := bson.D{{"_id", req.Id}}
+
+	var found *MongoProduct
+	objectId, err := primitive.ObjectIDFromHex(req.GetId())
+	var response *pb.UpdateProductCountResponse
+	response.Id = objectId
+	filter := bson.D{{"_id", objectId}}
 
 	err := p.productColl.FindOne(ctx, filter).Decode(found)
 	if err != nil {
@@ -461,17 +465,24 @@ func (p *productCatalog) UpdateProductCount(ctx context.Context, req *pb.GetProd
 	} else if found == nil {
 		return nil, status.Errorf(codes.NotFound, "no product with ID %s", req.Id)
 	}
+	updatedCount := found.Units - req.GetCount()
+	if updatedCount < 0 {
+		return response, errors.New("update fail: Count is more than number of available units.")
+	}
+
 	document := bson.D{
 		{"name", found.Name},
 		{"description", found.Description},
 		{"picture", found.Picture},
 		{"price_usd", found.PriceUsd},
 		{"categories", found.Categories},
-		{"units", found.Units - 1},
+		{"units", found.Units - req.GetCount()},
+		{"sold", found.Sold + req.GetCount()},
 	}
 	update := bson.D{{"$set", document}}
 	_, err = p.productColl.UpdateOne(ctx, filter, update)
-	return found, nil
+
+	return response, nil
 }
 
 func mustMapEnv(target *string, envKey string) {
