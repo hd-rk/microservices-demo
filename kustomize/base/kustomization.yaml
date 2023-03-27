@@ -48,3 +48,7 @@ secretGenerator:
   type: "Opaque"
   envs:
   - secret/productcatalog.env
+- name: cart-secret
+  type: "Opaque"
+  envs:
+  - secret/cart.env
