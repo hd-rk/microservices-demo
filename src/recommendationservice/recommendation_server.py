@@ -34,7 +34,7 @@ from opentelemetry.instrumentation.grpc import GrpcInstrumentorClient, GrpcInstr
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-import redis
+# import redis
 import time
 import pymongo
 # import threading
@@ -71,10 +71,8 @@ def initStackdriverProfiling():
 
 class RecommendationService(demo_pb2_grpc.RecommendationServiceServicer):
     def __init__(self):
-        self.client = pymongo.MongoClient(
-            host=os.environ.get('MONGO_HOST', 'localhost'),
-            port=int(os.environ.get('MONGO_PORT', '27017')),
-        )
+        mongo_uri = os.environ.get('MONGO_CONNECTION_URL', '')
+        self.client = pymongo.MongoClient(mongo_uri)
         self.db = self.client['recommendation']
         self.max_responses = 5
         self.max_cached_products = 20
@@ -97,8 +95,8 @@ class RecommendationService(demo_pb2_grpc.RecommendationServiceServicer):
             channel = grpc.insecure_channel(catalog_addr)
         product_catalog_stub = demo_pb2_grpc.ProductCatalogServiceStub(channel)
         cat_response = product_catalog_stub.GetRecommendations(demo_pb2.Empty())
-        product_ids = [x.id for x in cat_response.products]
-        top_products = product_ids[:self.max_cached_products]
+        top_products = [x.id for x in cat_response.products]
+        # top_products = product_ids[:self.max_cached_products]
         logger.info(f"top_products = {top_products}")
         
         self.db.cache.update_one(
@@ -167,6 +165,7 @@ if __name__ == "__main__":
             service.update_cache()
             logger.info("completed recommendation cache update")
         except Exception as err:
+            print(err)
             logger.warning(err)
     else:
         try:

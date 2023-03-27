@@ -119,6 +119,7 @@ wrapt==1.14.1
     #   deprecated
     #   opentelemetry-instrumentation
     #   opentelemetry-instrumentation-grpc
-redis==4.5.1
+# redis==4.5.1
+pymongo==4.3.3
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
