@@ -83,6 +83,8 @@ type checkoutService struct {
 
 	paymentSvcAddr string
 	paymentSvcConn *grpc.ClientConn
+
+	pb.UnimplementedCheckoutServiceServer
 }
 
 func main() {
@@ -277,6 +279,11 @@ func (cs *checkoutService) PlaceOrder(ctx context.Context, req *pb.PlaceOrderReq
 		return nil, status.Errorf(codes.Unavailable, "shipping error: %+v", err)
 	}
 
+	err = cs.updateInvetory(ctx, prep.orderItems)
+	if err != nil {
+		return nil, status.Errorf(codes.Unavailable, "inventory error: %+v", err)
+	}
+
 	_ = cs.emptyUserCart(ctx, req.UserId)
 
 	orderResult := &pb.OrderResult{
@@ -408,4 +415,18 @@ func (cs *checkoutService) shipOrder(ctx context.Context, address *pb.Address, i
 		return "", fmt.Errorf("shipment failed: %+v", err)
 	}
 	return resp.GetTrackingId(), nil
+}
+
+func (cs *checkoutService) updateInvetory(ctx context.Context, items []*pb.OrderItem) error {
+	catalogSvc := pb.NewProductCatalogServiceClient(cs.productCatalogSvcConn)
+	for _, item := range items {
+		_, err := catalogSvc.UpdateProductCount(ctx, &pb.UpdateProductCountRequest{
+			Id:    item.GetItem().GetProductId(),
+			Count: item.GetItem().GetQuantity(),
+		})
+		if err != nil {
+			log.Warnf("Failed to update product inventory %v", err)
+		}
+	}
+	return nil
 }
