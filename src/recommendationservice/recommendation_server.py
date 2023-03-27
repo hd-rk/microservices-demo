@@ -95,7 +95,7 @@ class RecommendationService(demo_pb2_grpc.RecommendationServiceServicer):
             channel = grpc.insecure_channel(catalog_addr)
         product_catalog_stub = demo_pb2_grpc.ProductCatalogServiceStub(channel)
         cat_response = product_catalog_stub.GetRecommendations(demo_pb2.Empty())
-        top_products = [x.id for x in cat_response.products]
+        top_products = [x.id for x in cat_response.results]
         # top_products = product_ids[:self.max_cached_products]
         logger.info(f"top_products = {top_products}")
         
