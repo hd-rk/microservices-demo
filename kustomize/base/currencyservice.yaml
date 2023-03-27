@@ -41,7 +41,7 @@ spec:
               - ALL
           privileged: false
           readOnlyRootFilesystem: true
-        image: gcr.io/cmpt-756-serverful/demo/currencyservice@sha256:8ab133afa2016662cf0c2a02b251beb9132c2a9af628d5baacc5db71899d8d50
+        image: gcr.io/cmpt-756-serverful/demo/currencyservice@sha256:919a79c224e7eefd1c735c9b67dda8f667349457b740afbf268c909a3634a4f1
         ports:
         - name: grpc
           containerPort: 7000
