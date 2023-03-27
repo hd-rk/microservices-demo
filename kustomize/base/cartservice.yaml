@@ -41,12 +41,12 @@ spec:
               - ALL
           privileged: false
           readOnlyRootFilesystem: true
-        image: gcr.io/google-samples/microservices-demo/cartservice:v0.5.2
+        image: gcr.io/cmpt-756-serverful/demo/cartservice@sha256:967105672ca893c94cfefd73a1d84afba98cc9911255943b410d5fdc209883be
         ports:
-        - containerPort: 7070
-        env:
-        - name: REDIS_ADDR
-          value: "redis-cart:6379"
+        - containerPort: 8080
+        envFrom:
+          - secretRef:
+              name: cart-secret
         resources:
           requests:
             cpu: 200m
@@ -57,12 +57,12 @@ spec:
         readinessProbe:
           initialDelaySeconds: 15
           exec:
-            command: ["/bin/grpc_health_probe", "-addr=:7070", "-rpc-timeout=5s"]
+            command: ["/bin/grpc_health_probe", "-addr=:8080", "-rpc-timeout=5s"]
         livenessProbe:
           initialDelaySeconds: 15
           periodSeconds: 10
           exec:
-            command: ["/bin/grpc_health_probe", "-addr=:7070", "-rpc-timeout=5s"]
+            command: ["/bin/grpc_health_probe", "-addr=:8080", "-rpc-timeout=5s"]
 ---
 apiVersion: v1
 kind: Service
@@ -75,4 +75,4 @@ spec:
   ports:
   - name: grpc
     port: 7070
-    targetPort: 7070
+    targetPort: 8080
