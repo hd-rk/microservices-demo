@@ -41,7 +41,7 @@ spec:
               - ALL
           privileged: false
           readOnlyRootFilesystem: true
-        image: gcr.io/cmpt-756-serverful/demo/productcatalogservice@sha256:7fe788459c284faa637ed9d701a571c552480effae6b8b42ef10faee02da8127
+        image: gcr.io/cmpt-756-serverful/demo/productcatalogservice@sha256:5f99453f8e3dc35f7fc852c1f71d68a7f94e1cfce56913a5ab04b1d134fe85b4
         ports:
         - containerPort: 3550
         env:
