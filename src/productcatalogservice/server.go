@@ -172,6 +172,8 @@ func main() {
 		getEnv("MONGODB_SSL", "false"),
 	)
 
+	// mongoUri := "mongodb://localhost:65000"
+
 	if os.Getenv("PORT") != "" {
 		port = os.Getenv("PORT")
 	}
@@ -440,12 +442,7 @@ func (p *productCatalog) GetRecommendations(ctx context.Context, req *pb.Empty) 
 	time.Sleep(extraLatency)
 	// Intepret query as a substring match in name or description.
 	var ps []*pb.Product
-	// for _, p := range parseCatalog() {
-	//  if strings.Contains(strings.ToLower(p.Name), strings.ToLower(req.Query)) ||
-	//    strings.Contains(strings.ToLower(p.Description), strings.ToLower(req.Query)) && p.UnitsBought {
-	//    ps = append(ps, p)
-	//  }
-	// }
+	var products []MongoProduct
 
 	filter := bson.D{}
 	opts := options.Find().SetSort(bson.D{{"sold", -1}}).SetLimit(5)
@@ -455,9 +452,13 @@ func (p *productCatalog) GetRecommendations(ctx context.Context, req *pb.Empty) 
 		return nil, err
 	}
 
-	if err = cursor.All(ctx, ps); err != nil {
+	if err = cursor.All(ctx, &products); err != nil {
 		log.Errorf("Couldn't retrieve the products")
 		return nil, err
+	}
+
+	for _, mp := range products {
+		ps = append(ps, productMongoToGPB(&mp))
 	}
 
 	return &pb.SearchProductsResponse{Results: ps}, nil
@@ -465,10 +466,9 @@ func (p *productCatalog) GetRecommendations(ctx context.Context, req *pb.Empty) 
 
 func (p *productCatalog) UpdateProductCount(ctx context.Context, req *pb.UpdateProductCountRequest) (*pb.UpdateProductCountResponse, error) {
 	time.Sleep(extraLatency)
-	var found *pb.Product
+	var found *MongoProduct
+	// var results *pb.Product
 	objectId, err := primitive.ObjectIDFromHex(req.GetId())
-	var response *pb.UpdateProductCountResponse
-	response.Id = objectId.Hex()
 	filter := bson.D{{"_id", objectId}}
 
 	err = p.productColl.FindOne(ctx, filter).Decode(&found)
@@ -480,27 +480,29 @@ func (p *productCatalog) UpdateProductCount(ctx context.Context, req *pb.UpdateP
 	}
 	updatedCount := found.Units - req.GetCount()
 	if updatedCount < 0 {
-		return response, errors.New("update fail: Count is more than number of available units.")
+		return &pb.UpdateProductCountResponse{Id: req.GetId()}, errors.New("update fail: Count is more than number of available units.")
 	}
 
+	fmt.Println("FOUND ITEMS: ", found)
+	results := productMongoToGPB(found)
 	document := bson.D{
-		{"name", found.Name},
-		{"description", found.Description},
-		{"picture", found.Picture},
+		{"name", results.Name},
+		{"description", results.Description},
+		{"picture", results.Picture},
 		{"price_usd", bson.D{
 			{"currencyCode", "USD"},
-			{"units", found.PriceUsd.Units},
-			{"nanos", found.PriceUsd.Nanos},
+			{"units", results.PriceUsd.Units},
+			{"nanos", results.PriceUsd.Nanos},
 		},
 		},
-		{"categories", found.Categories},
-		{"units", found.Units - req.GetCount()},
-		{"sold", found.Sold + req.GetCount()},
+		{"categories", results.Categories},
+		{"units", results.Units - req.GetCount()},
+		{"sold", results.Sold + req.GetCount()},
 	}
 	update := bson.D{{"$set", document}}
 	_, err = p.productColl.UpdateOne(ctx, filter, update)
 
-	return response, nil
+	return &pb.UpdateProductCountResponse{Id: req.GetId()}, nil
 }
 
 func mustMapEnv(target *string, envKey string) {
