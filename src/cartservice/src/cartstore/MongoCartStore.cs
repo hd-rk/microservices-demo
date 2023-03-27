@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Grpc.Core;
-using Microsoft.Extensions.Caching.Distributed;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Google.Protobuf;
@@ -11,13 +10,18 @@ namespace cartservice.cartstore
 {
     public class MongoCartStore : ICartStore
     {
-        private readonly IMongoCollection<Hipstershop.Cart> _cartCollection;
+        private readonly IMongoCollection<BsonDocument> _collection;
 
-        public MongoCartStore(string connectionString, string databaseName)
+        public MongoCartStore(string mongoConnectionString, string mongoDatabaseName)
         {
-            var client = new MongoClient(connectionString);
-            var database = client.GetDatabase(databaseName);
-            _cartCollection = database.GetCollection<Hipstershop.Cart>("carts");
+            var client = new MongoClient(mongoConnectionString);
+            var database = client.GetDatabase(mongoDatabaseName);
+            _collection = database.GetCollection<BsonDocument>("carts");
+
+            MongoDB.Bson.Serialization.BsonSerializer.RegisterSerializer(
+                typeof(System.Dynamic.ExpandoObject),
+                new MongoDB.Bson.Serialization.Serializers.ExpandoObjectSerializer()
+            );
         }
 
         public async Task AddItemAsync(string userId, string productId, int quantity)
@@ -26,28 +30,17 @@ namespace cartservice.cartstore
 
             try
             {
-                var filter = Builders<Hipstershop.Cart>.Filter.Eq("UserId", userId);
-                var cart = await _cartCollection.Find(filter).FirstOrDefaultAsync();
-                if (cart == null)
+                var filter = Builders<BsonDocument>.Filter.Eq("_id", userId);
+                var update = Builders<BsonDocument>.Update.AddToSet("items", new BsonDocument
                 {
-                    cart = new Hipstershop.Cart();
-                    cart.UserId = userId;
-                    cart.Items.Add(new Hipstershop.CartItem { ProductId = productId, Quantity = quantity });
-                    await _cartCollection.InsertOneAsync(cart);
-                }
-                else
+                    { "product_id", productId },
+                    { "quantity", quantity }
+                });
+
+                await _collection.UpdateOneAsync(filter, update, new UpdateOptions
                 {
-                    var existingItem = cart.Items.SingleOrDefault(i => i.ProductId == productId);
-                    if (existingItem == null)
-                    {
-                        cart.Items.Add(new Hipstershop.CartItem { ProductId = productId, Quantity = quantity });
-                    }
-                    else
-                    {
-                        existingItem.Quantity += quantity;
-                    }
-                    await _cartCollection.ReplaceOneAsync(filter, cart);
-                }
+                    IsUpsert = true
+                });
             }
             catch (Exception ex)
             {
@@ -61,8 +54,13 @@ namespace cartservice.cartstore
 
             try
             {
-                var filter = Builders<Hipstershop.Cart>.Filter.Eq("UserId", userId);
-                await _cartCollection.DeleteOneAsync(filter);
+                var filter = Builders<BsonDocument>.Filter.Eq("_id", userId);
+                var update = Builders<BsonDocument>.Update.Set("items", new BsonArray());
+
+                await _collection.UpdateOneAsync(filter, update, new UpdateOptions
+                {
+                    IsUpsert = true
+                });
             }
             catch (Exception ex)
             {
@@ -76,13 +74,29 @@ namespace cartservice.cartstore
 
             try
             {
-                var filter = Builders<Hipstershop.Cart>.Filter.Eq("UserId", userId);
-                var cart = await _cartCollection.Find(filter).FirstOrDefaultAsync();
-                if (cart == null)
+                var filter = Builders<BsonDocument>.Filter.Eq("_id", userId);
+                var document = await _collection.Find(filter).FirstOrDefaultAsync();
+
+                if (document != null)
                 {
-                    return new Hipstershop.Cart();
+                    var cart = new Hipstershop.Cart
+                    {
+                        UserId = document["_id"].AsString
+                    };
+
+                    foreach (BsonDocument item in document["items"].AsBsonArray)
+                    {
+                        cart.Items.Add(new Hipstershop.CartItem
+                        {
+                            ProductId = item["product_id"].AsString,
+                            Quantity = item["quantity"].AsInt32
+                        });
+                    }
+
+                    return cart;
                 }
-                return cart;
+
+                return new Hipstershop.Cart();
             }
             catch (Exception ex)
             {
@@ -94,7 +108,8 @@ namespace cartservice.cartstore
         {
             try
             {
-                _cartCollection.Find(new BsonDocument()).FirstOrDefault();
+                var command = new BsonDocument { { "ping", 1 } };
+                _collection.Database.RunCommand<BsonDocument>(command);
                 return true;
             }
             catch (Exception)

@@ -11,7 +11,7 @@
     <!-- Add explicit direct dependency required for ipv6, see https://github.com/dotnet/aspnetcore/issues/45424 -->
     <PackageReference Include="StackExchange.Redis" Version="2.6.96" />
     <PackageReference Include="Google.Cloud.Spanner.Data" Version="4.3.0" />
-    <PackageReference Include="MongoDB.Driver" Version="2.13.3" />
+    <PackageReference Include="MongoDB.Driver" Version="2.19" />
   </ItemGroup>
 
   <ItemGroup>
