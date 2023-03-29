@@ -36,11 +36,15 @@ secretGenerator:
   type: "Opaque"
   envs:
   - secret/currency.env
-- name: email-secret
-  type: "Opaque"
-  envs:
-  - secret/email.env
 - name: recommendation-secret
   type: "Opaque"
   envs:
   - secret/recommendation.env
+- name: productcatalog-secret
+  type: "Opaque"
+  envs:
+  - secret/productcatalog.env
+- name: cart-secret
+  type: "Opaque"
+  envs:
+  - secret/cart.env
