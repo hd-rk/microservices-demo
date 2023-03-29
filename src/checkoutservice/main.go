@@ -426,6 +426,7 @@ func (cs *checkoutService) updateInvetory(ctx context.Context, items []*pb.Order
 		})
 		if err != nil {
 			log.Warnf("Failed to update product inventory %v", err)
+			return err
 		}
 	}
 	return nil
