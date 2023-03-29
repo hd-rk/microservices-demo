@@ -94,6 +94,7 @@ spec:
       labels:
         app: currency-updater
     spec:
+      backoffLimit: 1
       template:
         metadata:
           annotations:
