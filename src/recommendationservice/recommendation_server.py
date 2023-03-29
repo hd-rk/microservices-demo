@@ -34,8 +34,9 @@ from opentelemetry.instrumentation.grpc import GrpcInstrumentorClient, GrpcInstr
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-import redis
+# import redis
 import time
+import pymongo
 # import threading
 
 from logger import getJSONLogger
@@ -70,10 +71,9 @@ def initStackdriverProfiling():
 
 class RecommendationService(demo_pb2_grpc.RecommendationServiceServicer):
     def __init__(self):
-        self.cache = redis.Redis(
-            host=os.environ.get('REDIS_HOST', 'localhost'),
-            port=os.environ.get('REDIS_PORT', '6379'),
-            db=0)
+        mongo_uri = os.environ.get('MONGO_CONNECTION_URL', '')
+        self.client = pymongo.MongoClient(mongo_uri)
+        self.db = self.client['recommendation']
         self.max_responses = 5
         self.max_cached_products = 20
         # self.cache_expiry = 300  # 5 minutes in seconds
@@ -94,19 +94,26 @@ class RecommendationService(demo_pb2_grpc.RecommendationServiceServicer):
         else:
             channel = grpc.insecure_channel(catalog_addr)
         product_catalog_stub = demo_pb2_grpc.ProductCatalogServiceStub(channel)
-        cat_response = product_catalog_stub.ListProducts(demo_pb2.Empty())
-        product_ids = [x.id for x in cat_response.products]
-        top_products = product_ids[:self.max_cached_products]
+        cat_response = product_catalog_stub.GetRecommendations(demo_pb2.Empty())
+        top_products = [x.id for x in cat_response.results]
+        # top_products = product_ids[:self.max_cached_products]
         logger.info(f"top_products = {top_products}")
-        self.cache.set('top_products', ','.join(top_products))
+        
+        self.db.cache.update_one(
+            {'_id': 'top_products'},
+            {'$set': {'products': top_products}},
+            upsert=True
+        )
         # self.last_cache_update = time.time()
         # time.sleep(self.cache_expiry)
 
     def ListRecommendations(self, request, context):
         # retrieve top products from cache
-        if not self.cache.exists('top_products'):
+        cache = self.db.cache.find_one({'_id': 'top_products'})
+        if not cache:
             self.update_cache()
-        top_products = self.cache.get('top_products').decode().split(',')
+            cache = self.db.cache.find_one({'_id': 'top_products'})
+        top_products = cache['products']
 
         # filter and sample products
         filtered_products = list(set(top_products)-set(request.product_ids))
@@ -158,6 +165,7 @@ if __name__ == "__main__":
             service.update_cache()
             logger.info("completed recommendation cache update")
         except Exception as err:
+            print(err)
             logger.warning(err)
     else:
         try:

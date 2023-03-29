@@ -161,16 +161,20 @@ func main() {
 	// }()
 
 	// mongodb+srv://demo-user:geer8nqi3AVf@demo-mongodb-svc.mongodb.svc.cluster.local/product_catalog?replicaSet=demo-mongodb&ssl=false&authSource=admin
-	mongoUri := fmt.Sprintf(
-		"%s://%s:%s@%s/%s?replicaSet=%s&ssl=%s&authSource=admin",
-		getEnv("MONGODB_PROTOCOL", "mongodb+srv"),
-		getEnv("MONGODB_USERNAME", "username"),
-		getEnv("MONGODB_PASSWORD", "password"),
-		getEnv("MONGODB_HOST", "localhost"),
-		getEnv("MONGODB_DATABASE", "product_catalog"),
-		getEnv("MONGODB_RS", "demo-mongodb"),
-		getEnv("MONGODB_SSL", "false"),
-	)
+	// mongoUri := fmt.Sprintf(
+	// 	"%s://%s:%s@%s/%s?replicaSet=%s&ssl=%s&authSource=admin",
+	// 	getEnv("MONGODB_PROTOCOL", "mongodb+srv"),
+	// 	getEnv("MONGODB_USERNAME", "username"),
+	// 	getEnv("MONGODB_PASSWORD", "password"),
+	// 	getEnv("MONGODB_HOST", "localhost"),
+	// 	getEnv("MONGODB_DATABASE", "product_catalog"),
+	// 	getEnv("MONGODB_RS", "demo-mongodb"),
+	// 	getEnv("MONGODB_SSL", "false"),
+	// )
+	mongoUri := getEnv("MONGODB_CONNECTION_STRING", "")
+	if mongoUri == "" {
+		log.Fatal("Missing MONGODB_CONNECTION_STRING")
+	}
 
 	// mongoUri := "mongodb://localhost:65000"
 

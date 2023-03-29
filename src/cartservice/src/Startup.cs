@@ -10,6 +10,7 @@ using Microsoft.Extensions.Hosting;
 using cartservice.cartstore;
 using cartservice.services;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
+using MongoDB.Driver;
 
 namespace cartservice
 {
@@ -26,17 +27,14 @@ namespace cartservice
         // For more information on how to configure your application, visit https://go.microsoft.com/fwlink/?LinkID=398940
         public void ConfigureServices(IServiceCollection services)
         {
-            string redisAddress = Configuration["REDIS_ADDR"];
             string spannerProjectId = Configuration["SPANNER_PROJECT"];
             string spannerConnectionString = Configuration["SPANNER_CONNECTION_STRING"];
+            string mongoConnectionString = Configuration["MONGO_CONNECTION_STRING"];
+            string mongoDatabaseName = Configuration["MONGO_DATABASE_NAME"];
 
-            if (!string.IsNullOrEmpty(redisAddress))
+            if (!string.IsNullOrEmpty(mongoConnectionString) && !string.IsNullOrEmpty(mongoDatabaseName))
             {
-                services.AddStackExchangeRedisCache(options =>
-                {
-                    options.Configuration = redisAddress;
-                });
-                services.AddSingleton<ICartStore, RedisCartStore>();
+                services.AddSingleton<ICartStore>(new MongoCartStore(mongoConnectionString, mongoDatabaseName));
             }
             else if (!string.IsNullOrEmpty(spannerProjectId) || !string.IsNullOrEmpty(spannerConnectionString))
             {
@@ -44,11 +42,10 @@ namespace cartservice
             }
             else
             {
-                Console.WriteLine("Redis cache host(hostname+port) was not specified. Starting a cart service using in memory store");
+                Console.WriteLine("Mongo cache host(hostname+port) was not specified. Starting a cart service using in memory store");
                 services.AddDistributedMemoryCache();
-                services.AddSingleton<ICartStore, RedisCartStore>();
+                services.AddSingleton<ICartStore, MongoCartStore>();
             }
-
 
             services.AddGrpc();
         }

@@ -41,7 +41,7 @@ spec:
               - ALL
           privileged: false
           readOnlyRootFilesystem: true
-        image: gcr.io/google-samples/microservices-demo/paymentservice:v0.5.2
+        image: gcr.io/cmpt-756-serverful/demo/paymentservice@sha256:ca603ce26f91bb5ab1413f7f1574db91af5d39a5241f7bd1e6915df76d013f32
         ports:
         - containerPort: 50051
         env:
