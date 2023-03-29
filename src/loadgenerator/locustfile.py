@@ -19,15 +19,15 @@ from locust import HttpUser, TaskSet, between
 import logging
 
 products = [
-    '0PUK6V6EV0',
-    '1YMWWN1N4O',
-    '2ZYFJ3GM2N',
-    '66VCHSJNUP',
-    '6E92ZMYYFZ',
-    '9SIQT8TOJO',
-    'L9ECAV7KIM',
-    'LS4PSXUNUM',
-    'OLJCESPC7Z']
+    '6420eb66767b30fe05a3f2e1',
+    '6420eb66767b30fe05a3f2e3',
+    '6420eb66767b30fe05a3f2db',
+    '6420eb66767b30fe05a3f2dd',
+    '6420eb66767b30fe05a3f2dc',
+    '6420eb66767b30fe05a3f2df',
+    '6420eb66767b30fe05a3f2e2',
+    '6420eb66767b30fe05a3f2de',
+    '6420eb66767b30fe05a3f2e0']
 
 
 
@@ -45,6 +45,7 @@ def setCurrency(l):
         cookies=l.cookies)
 
 def browseProduct(l):
+    logging.info(f"loading product page with cookie: {l.cookies['shop_session-id']}")
     l.client.get("/product/" + random.choice(products),
         cookies=l.cookies)
 
