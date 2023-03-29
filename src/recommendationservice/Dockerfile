@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# docker build -f Dockerfile -t gcr.io/cmpt-756-serverful/demo/recommendationservice . && docker push gcr.io/cmpt-756-serverful/demo/recommendationservice
+
 FROM python:3.10.8-slim@sha256:49749648f4426b31b20fca55ad854caa55ff59dc604f2f76b57d814e0a47c181 as base
 
 FROM base as builder
@@ -30,6 +32,12 @@ RUN wget -qO/bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health
 # get packages
 COPY requirements.txt .
 RUN pip install -r requirements.txt
+RUN pip install grpcio grpcio-tools
+
+WORKDIR /opt
+
+COPY pb ./pb
+RUN python -m grpc_tools.protoc -I./pb --python_out=. --grpc_python_out=. ./pb/demo.proto
 
 FROM base as without-grpc-health-probe-bin
 # Enable unbuffered logging
@@ -43,6 +51,9 @@ COPY --from=builder /usr/local/lib/python3.10/ /usr/local/lib/python3.10/
 
 # Add the application
 COPY . .
+
+COPY --from=builder /opt/demo_pb2.py .
+COPY --from=builder /opt/demo_pb2_grpc.py .
 
 # set listen port
 ENV PORT "8080"

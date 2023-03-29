@@ -16,9 +16,12 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/profiler"
@@ -27,6 +30,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 
 	pb "github.com/GoogleCloudPlatform/microservices-demo/src/checkoutservice/genproto"
@@ -79,6 +83,8 @@ type checkoutService struct {
 
 	paymentSvcAddr string
 	paymentSvcConn *grpc.ClientConn
+
+	pb.UnimplementedCheckoutServiceServer
 }
 
 func main() {
@@ -205,12 +211,28 @@ func mustMapEnv(target *string, envKey string) {
 
 func mustConnGRPC(ctx context.Context, conn **grpc.ClientConn, addr string) {
 	var err error
+	var opts []grpc.DialOption
 	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
-	*conn, err = grpc.DialContext(ctx, addr,
-		grpc.WithInsecure(),
+
+	if strings.HasSuffix(addr, ":443") {
+		systemRoots, err := x509.SystemCertPool()
+		if err != nil {
+			panic(errors.Wrapf(err, "grpc: failed to connect %s", addr))
+		}
+		cred := credentials.NewTLS(&tls.Config{
+			RootCAs: systemRoots,
+		})
+		opts = append(opts, grpc.WithTransportCredentials(cred))
+	} else {
+		opts = append(opts, grpc.WithInsecure())
+	}
+
+	opts = append(opts,
 		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
 		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()))
+
+	*conn, err = grpc.DialContext(ctx, addr, opts...)
 	if err != nil {
 		panic(errors.Wrapf(err, "grpc: failed to connect %s", addr))
 	}
@@ -255,6 +277,11 @@ func (cs *checkoutService) PlaceOrder(ctx context.Context, req *pb.PlaceOrderReq
 	shippingTrackingID, err := cs.shipOrder(ctx, req.Address, prep.cartItems)
 	if err != nil {
 		return nil, status.Errorf(codes.Unavailable, "shipping error: %+v", err)
+	}
+
+	err = cs.updateInvetory(ctx, prep.orderItems)
+	if err != nil {
+		return nil, status.Errorf(codes.Unavailable, "inventory error: %+v", err)
 	}
 
 	_ = cs.emptyUserCart(ctx, req.UserId)
@@ -388,4 +415,18 @@ func (cs *checkoutService) shipOrder(ctx context.Context, address *pb.Address, i
 		return "", fmt.Errorf("shipment failed: %+v", err)
 	}
 	return resp.GetTrackingId(), nil
+}
+
+func (cs *checkoutService) updateInvetory(ctx context.Context, items []*pb.OrderItem) error {
+	catalogSvc := pb.NewProductCatalogServiceClient(cs.productCatalogSvcConn)
+	for _, item := range items {
+		_, err := catalogSvc.UpdateProductCount(ctx, &pb.UpdateProductCountRequest{
+			Id:    item.GetItem().GetProductId(),
+			Count: item.GetItem().GetQuantity(),
+		})
+		if err != nil {
+			log.Warnf("Failed to update product inventory %v", err)
+		}
+	}
+	return nil
 }

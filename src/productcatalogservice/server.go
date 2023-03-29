@@ -22,10 +22,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"os/signal"
-	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	pb "github.com/GoogleCloudPlatform/microservices-demo/src/productcatalogservice/genproto"
@@ -44,6 +41,12 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 var (
@@ -73,6 +76,41 @@ func init() {
 	if err != nil {
 		log.Warnf("could not parse product catalog")
 	}
+}
+
+func connectDb(ctx context.Context, serverUri, serverDb string) (*mongo.Collection, error) {
+
+	// Use the SetServerAPIOptions() method to set the Stable API version to 1
+	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
+	opts := options.Client().ApplyURI(serverUri).SetServerAPIOptions(serverAPI)
+
+	// Create a new client and connect to the server
+	client, err := mongo.Connect(ctx, opts)
+
+	if err != nil {
+		log.Errorf("Failed to connect to MongoDB %v", err)
+		return nil, err
+	}
+
+	collection := client.Database(serverDb).Collection("products")
+	return collection, nil
+}
+
+type productCatalog struct {
+	pb.UnimplementedProductCatalogServiceServer
+	productColl *mongo.Collection
+}
+
+type MongoProduct struct {
+	ID          primitive.ObjectID `bson:"_id,omitempty"`
+	Name        string             `bson:"name,omitempty"`
+	Description string             `bson:"description,omitempty"`
+	Picture     string             `bson:"picture,omitempty"`
+	PriceUnits  int64              `bson:"price_units,omitempty"`
+	PriceNanos  int32              `bson:"price_nanos,omitempty"`
+	Categories  []string           `bson:"categories,omitempty"`
+	Units       int32              `bson:"units,omitempty"`
+	Sold        int32              `bson:"sold,omitempty"`
 }
 
 func main() {
@@ -106,31 +144,45 @@ func main() {
 		extraLatency = time.Duration(0)
 	}
 
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGUSR1, syscall.SIGUSR2)
-	go func() {
-		for {
-			sig := <-sigs
-			log.Printf("Received signal: %s", sig)
-			if sig == syscall.SIGUSR1 {
-				reloadCatalog = true
-				log.Infof("Enable catalog reloading")
-			} else {
-				reloadCatalog = false
-				log.Infof("Disable catalog reloading")
-			}
-		}
-	}()
+	// sigs := make(chan os.Signal, 1)
+	// signal.Notify(sigs, syscall.SIGUSR1, syscall.SIGUSR2)
+	// go func() {
+	// 	for {
+	// 		sig := <-sigs
+	// 		log.Printf("Received signal: %s", sig)
+	// 		if sig == syscall.SIGUSR1 {
+	// 			reloadCatalog = true
+	// 			log.Infof("Enable catalog reloading")
+	// 		} else {
+	// 			reloadCatalog = false
+	// 			log.Infof("Disable catalog reloading")
+	// 		}
+	// 	}
+	// }()
+
+	// mongodb+srv://demo-user:geer8nqi3AVf@demo-mongodb-svc.mongodb.svc.cluster.local/product_catalog?replicaSet=demo-mongodb&ssl=false&authSource=admin
+	mongoUri := fmt.Sprintf(
+		"%s://%s:%s@%s/%s?replicaSet=%s&ssl=%s&authSource=admin",
+		getEnv("MONGODB_PROTOCOL", "mongodb+srv"),
+		getEnv("MONGODB_USERNAME", "username"),
+		getEnv("MONGODB_PASSWORD", "password"),
+		getEnv("MONGODB_HOST", "localhost"),
+		getEnv("MONGODB_DATABASE", "product_catalog"),
+		getEnv("MONGODB_RS", "demo-mongodb"),
+		getEnv("MONGODB_SSL", "false"),
+	)
+
+	// mongoUri := "mongodb://localhost:65000"
 
 	if os.Getenv("PORT") != "" {
 		port = os.Getenv("PORT")
 	}
 	log.Infof("starting grpc server at :%s", port)
-	run(port)
+	run(port, mongoUri, getEnv("MONGODB_DATABASE", "product_catalog"))
 	select {}
 }
 
-func run(port string) string {
+func run(port, mongoDBUri, mongoDatabase string) string {
 	l, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
 		log.Fatal(err)
@@ -144,7 +196,14 @@ func run(port string) string {
 		grpc.UnaryInterceptor(otelgrpc.UnaryServerInterceptor()),
 		grpc.StreamInterceptor(otelgrpc.StreamServerInterceptor()))
 
-	svc := &productCatalog{}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	collection, err := connectDb(ctx, mongoDBUri, mongoDatabase)
+	svc := &productCatalog{
+		productColl: collection,
+	}
+
+	svc.loadProductIntoMongo()
 
 	pb.RegisterProductCatalogServiceServer(srv, svc)
 	healthpb.RegisterHealthServer(srv, svc)
@@ -202,8 +261,6 @@ func initProfiling(service, version string) {
 	log.Warn("could not initialize Stackdriver profiler after retrying, giving up")
 }
 
-type productCatalog struct{}
-
 func readCatalogFile(catalog *pb.ListProductsResponse) error {
 	catalogMutex.Lock()
 	defer catalogMutex.Unlock()
@@ -230,6 +287,84 @@ func parseCatalog() []*pb.Product {
 	return cat.Products
 }
 
+func productGPBToMongo(product *pb.Product) *MongoProduct {
+	return &MongoProduct{
+		Name:        product.Name,
+		Description: product.Description,
+		Picture:     product.Picture,
+		PriceUnits:  product.PriceUsd.Units,
+		PriceNanos:  product.PriceUsd.Nanos,
+		Categories:  product.Categories,
+		Units:       product.Units,
+		Sold:        product.Sold,
+	}
+}
+
+func productMongoToGPB(mp *MongoProduct) *pb.Product {
+	return &pb.Product{
+		Id:          mp.ID.Hex(),
+		Name:        mp.Name,
+		Description: mp.Description,
+		Picture:     mp.Picture,
+		PriceUsd: &pb.Money{
+			Units:        mp.PriceUnits,
+			Nanos:        mp.PriceNanos,
+			CurrencyCode: "USD",
+		},
+		Categories: mp.Categories,
+		Units:      mp.Units,
+		Sold:       mp.Sold,
+	}
+}
+
+func (p *productCatalog) loadProductIntoMongo() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	if count, err := p.productColl.CountDocuments(ctx, bson.D{}); err == nil && count > 0 {
+		log.Infof("%d products in db, no loading needed.", count)
+		return nil
+	}
+	products := parseCatalog()
+	var docs []interface{}
+	for _, product := range products {
+		docs = append(docs, MongoProduct{
+			Name:        product.Name,
+			Description: product.Description,
+			Picture:     product.Picture,
+			PriceUnits:  product.PriceUsd.Units,
+			PriceNanos:  product.PriceUsd.Nanos,
+			Categories:  product.Categories,
+			Units:       product.Units,
+			Sold:        product.Sold,
+		})
+	}
+	if result, err := p.productColl.InsertMany(context.TODO(), docs); err != nil {
+		log.Warnf("Error loading product documents into DB %v", err)
+		return err
+	} else {
+		log.Infof("%d inserted to db", len(result.InsertedIDs))
+	}
+
+	models := []mongo.IndexModel{
+		{
+			Keys: bsonx.Doc{
+				{Key: "name", Value: bsonx.String("text")},
+				{Key: "description", Value: bsonx.String("text")},
+			},
+		},
+		{
+			Keys: bsonx.Doc{{Key: "sold", Value: bsonx.Int32(-1)}},
+		},
+	}
+	_, err := p.productColl.Indexes().CreateMany(ctx, models)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (p *productCatalog) Check(ctx context.Context, req *healthpb.HealthCheckRequest) (*healthpb.HealthCheckResponse, error) {
 	return &healthpb.HealthCheckResponse{Status: healthpb.HealthCheckResponse_SERVING}, nil
 }
@@ -238,36 +373,136 @@ func (p *productCatalog) Watch(req *healthpb.HealthCheckRequest, ws healthpb.Hea
 	return status.Errorf(codes.Unimplemented, "health check via Watch not implemented")
 }
 
-func (p *productCatalog) ListProducts(context.Context, *pb.Empty) (*pb.ListProductsResponse, error) {
+func (p *productCatalog) ListProducts(ctx context.Context, req *pb.Empty) (*pb.ListProductsResponse, error) {
 	time.Sleep(extraLatency)
-	return &pb.ListProductsResponse{Products: parseCatalog()}, nil
+	var ps []*pb.Product
+	var products []MongoProduct
+	cursor, err := p.productColl.Find(ctx, bson.D{})
+	if err != nil {
+		log.Errorf("No documents regarding product catalog were found.")
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	if err = cursor.All(ctx, &products); err != nil {
+		log.Errorf("Couldn't retrieve the products")
+		return nil, err
+	}
+	// return &pb.ListProductsResponse{Products: parseCatalog()}, nil
+	for _, mp := range products {
+		ps = append(ps, productMongoToGPB(&mp))
+	}
+	return &pb.ListProductsResponse{Products: ps}, nil
 }
 
 func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb.Product, error) {
 	time.Sleep(extraLatency)
-	var found *pb.Product
-	for i := 0; i < len(parseCatalog()); i++ {
-		if req.Id == parseCatalog()[i].Id {
-			found = parseCatalog()[i]
-		}
+	var mp MongoProduct
+	objectId, err := primitive.ObjectIDFromHex(req.GetId())
+	if err != nil {
+		log.Errorf("Invalid product ID %s", req.GetId())
+		return nil, err
 	}
-	if found == nil {
+	if err = p.productColl.FindOne(ctx, bson.M{"_id": objectId}).Decode(&mp); err != nil {
+		log.Errorf("Error retrieving product %v", err)
+		return nil, err
+	}
+	if &mp == nil {
 		return nil, status.Errorf(codes.NotFound, "no product with ID %s", req.Id)
 	}
-	return found, nil
+	return productMongoToGPB(&mp), nil
 }
 
 func (p *productCatalog) SearchProducts(ctx context.Context, req *pb.SearchProductsRequest) (*pb.SearchProductsResponse, error) {
 	time.Sleep(extraLatency)
+
 	// Intepret query as a substring match in name or description.
 	var ps []*pb.Product
-	for _, p := range parseCatalog() {
-		if strings.Contains(strings.ToLower(p.Name), strings.ToLower(req.Query)) ||
-			strings.Contains(strings.ToLower(p.Description), strings.ToLower(req.Query)) {
-			ps = append(ps, p)
-		}
+
+	filter := bson.D{{"$text", bson.D{{"$search", req.Query}}}}
+	cursor, err := p.productColl.Find(ctx, filter)
+	if err != nil {
+		log.Errorf("No documents regarding product catalog were found.")
+		return nil, err
 	}
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var mp MongoProduct
+		if err := cursor.Decode(&mp); err != nil {
+			log.Errorf("err retrieving product %v", err)
+		}
+		ps = append(ps, productMongoToGPB(&mp))
+	}
+
 	return &pb.SearchProductsResponse{Results: ps}, nil
+}
+
+func (p *productCatalog) GetRecommendations(ctx context.Context, req *pb.Empty) (*pb.SearchProductsResponse, error) {
+	time.Sleep(extraLatency)
+	// Intepret query as a substring match in name or description.
+	var ps []*pb.Product
+	var products []MongoProduct
+
+	filter := bson.D{}
+	opts := options.Find().SetSort(bson.D{{"sold", -1}}).SetLimit(5)
+	cursor, err := p.productColl.Find(ctx, filter, opts)
+	if err != nil {
+		log.Errorf("No documents regarding product catalog were found.")
+		return nil, err
+	}
+
+	if err = cursor.All(ctx, &products); err != nil {
+		log.Errorf("Couldn't retrieve the products")
+		return nil, err
+	}
+
+	for _, mp := range products {
+		ps = append(ps, productMongoToGPB(&mp))
+	}
+
+	return &pb.SearchProductsResponse{Results: ps}, nil
+}
+
+func (p *productCatalog) UpdateProductCount(ctx context.Context, req *pb.UpdateProductCountRequest) (*pb.UpdateProductCountResponse, error) {
+	time.Sleep(extraLatency)
+	var found *MongoProduct
+	// var results *pb.Product
+	objectId, err := primitive.ObjectIDFromHex(req.GetId())
+	filter := bson.D{{"_id", objectId}}
+
+	err = p.productColl.FindOne(ctx, filter).Decode(&found)
+	if err != nil {
+		log.Warnf("Query exception %s", err)
+		return nil, status.Errorf(codes.Internal, "Query exception")
+	} else if found == nil {
+		return nil, status.Errorf(codes.NotFound, "no product with ID %s", req.Id)
+	}
+	updatedCount := found.Units - req.GetCount()
+	if updatedCount < 0 {
+		return &pb.UpdateProductCountResponse{Id: req.GetId()}, errors.New("update fail: Count is more than number of available units.")
+	}
+
+	fmt.Println("FOUND ITEMS: ", found)
+	results := productMongoToGPB(found)
+	document := bson.D{
+		{"name", results.Name},
+		{"description", results.Description},
+		{"picture", results.Picture},
+		{"price_usd", bson.D{
+			{"currencyCode", "USD"},
+			{"units", results.PriceUsd.Units},
+			{"nanos", results.PriceUsd.Nanos},
+		},
+		},
+		{"categories", results.Categories},
+		{"units", results.Units - req.GetCount()},
+		{"sold", results.Sold + req.GetCount()},
+	}
+	update := bson.D{{"$set", document}}
+	_, err = p.productColl.UpdateOne(ctx, filter, update)
+
+	return &pb.UpdateProductCountResponse{Id: req.GetId()}, nil
 }
 
 func mustMapEnv(target *string, envKey string) {
@@ -289,4 +524,11 @@ func mustConnGRPC(ctx context.Context, conn **grpc.ClientConn, addr string) {
 	if err != nil {
 		panic(errors.Wrapf(err, "grpc: failed to connect %s", addr))
 	}
+}
+
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
 }

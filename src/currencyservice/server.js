@@ -29,8 +29,19 @@ else {
 
 // Register GRPC OTel Instrumentation for trace propagation
 // regardless of whether tracing is emitted.
+const mysql = require('mysql2/promise');
 const { GrpcInstrumentation } = require('@opentelemetry/instrumentation-grpc');
 const { registerInstrumentations } = require('@opentelemetry/instrumentation');
+
+const db = mysql.createPool({
+  host: process.env.MYSQL_HOST,
+  user: process.env.MYSQL_USER,
+  password: process.env.MYSQL_PASSWORD,
+  database: process.env.MYSQL_DATABASE,
+  waitForConnections: true,
+});
+
+
 
 registerInstrumentations({
   instrumentations: [new GrpcInstrumentation()]
@@ -97,9 +108,15 @@ function _loadProto (path) {
  * Helper function that gets currency data from a stored JSON file
  * Uses public data from European Central Bank
  */
-function _getCurrencyData (callback) {
-  const data = require('./data/currency_conversion.json');
-  callback(data);
+async function _getCurrencyData (callback) {
+  // query database
+  const [rows, fields] = await db.execute('SELECT * FROM currency_conversion');
+  payload = {}
+  for(var i in rows){
+    var row = rows[i]
+    payload[row['currency_to']] = row['exchange_rate']
+  }
+  callback(payload);
 }
 
 /**
@@ -118,7 +135,7 @@ function _carry (amount) {
  */
 function getSupportedCurrencies (call, callback) {
   logger.info('Getting supported currencies...');
-  _getCurrencyData((data) => {
+  _getCurrencyData(async(data) => {
     callback(null, {currency_codes: Object.keys(data)});
   });
 }
@@ -128,7 +145,7 @@ function getSupportedCurrencies (call, callback) {
  */
 function convert (call, callback) {
   try {
-    _getCurrencyData((data) => {
+    _getCurrencyData(async(data) => {
       const request = call.request;
 
       // Convert: from_currency --> EUR
@@ -170,7 +187,8 @@ function check (call, callback) {
  * Starts an RPC server that receives requests for the
  * CurrencyConverter service at the sample server port
  */
-function main () {
+async function main () {
+
   logger.info(`Starting gRPC server on port ${PORT}...`);
   const server = new grpc.Server();
   server.addService(shopProto.CurrencyService.service, {getSupportedCurrencies, convert});
