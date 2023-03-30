@@ -381,7 +381,7 @@ func (p *productCatalog) ListProducts(ctx context.Context, req *pb.Empty) (*pb.L
 	time.Sleep(extraLatency)
 	var ps []*pb.Product
 	var products []MongoProduct
-	cursor, err := p.productColl.Find(ctx, bson.D{})
+	cursor, err := p.productColl.Find(ctx, bson.D{}, &options.FindOptions{Limit: &[]int64{9}[0]})
 	if err != nil {
 		log.Errorf("No documents regarding product catalog were found.")
 		return nil, err
