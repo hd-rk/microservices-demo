@@ -64,6 +64,10 @@ def checkout(l):
         'credit_card_cvv': '672',
     })
 
+def emptyCart(l):
+    addToCart(l)
+    l.client.post("/cart/empty")
+
 class UserBehavior(TaskSet):
 
     def on_start(self):
@@ -74,7 +78,8 @@ class UserBehavior(TaskSet):
         browseProduct: 10,
         addToCart: 2,
         viewCart: 3,
-        checkout: 1}
+        checkout: 1,
+        emptyCart: 1}
 
 class WebsiteUser(HttpUser):
     tasks = [UserBehavior]
