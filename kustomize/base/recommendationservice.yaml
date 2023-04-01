@@ -41,7 +41,7 @@ spec:
               - ALL
           privileged: false
           readOnlyRootFilesystem: true
-        image: gcr.io/cmpt-756-serverful/demo/recommendationservice@sha256:b62658baefdeb2cd6b56016ac3c48318eb951e080c21bef804d0010085ad875f
+        image: gcr.io/cmpt-756-serverful/demo/recommendationservice@sha256:1d6fff828d046f90a50d9ce5e857debd67145ffc3971ac8a2ccea8c3ffcc6831
         ports:
         - containerPort: 8080
         readinessProbe:
@@ -104,7 +104,7 @@ spec:
         spec:
           containers:
           - name: recommendation-updater
-            image: gcr.io/cmpt-756-serverful/demo/recommendationservice@sha256:b834800bd2d1e80a0a43f67b27b47d3baf90656d89c20df726a76b2d019edf4d
+            image: gcr.io/cmpt-756-serverful/demo/recommendationservice@sha256:1d6fff828d046f90a50d9ce5e857debd67145ffc3971ac8a2ccea8c3ffcc6831
             env:
             - name: ROLE
               value: updater

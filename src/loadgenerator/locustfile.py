@@ -16,38 +16,53 @@
 
 import random
 from locust import HttpUser, TaskSet, between
+import logging
 
 products = [
-    '0PUK6V6EV0',
-    '1YMWWN1N4O',
-    '2ZYFJ3GM2N',
-    '66VCHSJNUP',
-    '6E92ZMYYFZ',
-    '9SIQT8TOJO',
-    'L9ECAV7KIM',
-    'LS4PSXUNUM',
-    'OLJCESPC7Z']
+    '6420eb66767b30fe05a3f2e1',
+    '6420eb66767b30fe05a3f2e3',
+    '6420eb66767b30fe05a3f2db',
+    '6420eb66767b30fe05a3f2dd',
+    '6420eb66767b30fe05a3f2dc',
+    '6420eb66767b30fe05a3f2df',
+    '6420eb66767b30fe05a3f2e2',
+    '6420eb66767b30fe05a3f2de',
+    '6420eb66767b30fe05a3f2e0']
+
+
 
 def index(l):
-    l.client.get("/")
+    response = l.client.get("/")
+    if l.cookies is None:
+        l.cookies = response.cookies
+    logging.info(f"loading landing page with cookie: {l.cookies['shop_session-id']}")
 
 def setCurrency(l):
-    currencies = ['EUR', 'USD', 'JPY', 'CAD']
+    logging.info(f"loading setCurrenct page with cookie: {l.cookies['shop_session-id']}")
+    currencies = ['EUR', 'USD', 'JPY', 'CAD', 'GBP', 'TRY']
     l.client.post("/setCurrency",
-        {'currency_code': random.choice(currencies)})
+        {'currency_code': random.choice(currencies)},
+        cookies=l.cookies)
 
 def browseProduct(l):
-    l.client.get("/product/" + random.choice(products))
+    logging.info(f"loading product page with cookie: {l.cookies['shop_session-id']}")
+    l.client.get("/product/" + random.choice(products),
+        cookies=l.cookies)
 
 def viewCart(l):
-    l.client.get("/cart")
+    l.client.get("/cart",
+        cookies=l.cookies)
 
 def addToCart(l):
     product = random.choice(products)
-    l.client.get("/product/" + product)
-    l.client.post("/cart", {
-        'product_id': product,
-        'quantity': random.choice([1,2,3,4,5,10])})
+    l.client.get("/product/" + product,
+        cookies=l.cookies)
+    l.client.post("/cart", 
+        {
+            'product_id': product,
+            'quantity': random.choice([1,2,3,4,5,10])
+        },
+        cookies=l.cookies)
 
 def checkout(l):
     addToCart(l)
@@ -62,7 +77,7 @@ def checkout(l):
         'credit_card_expiration_month': '1',
         'credit_card_expiration_year': '2039',
         'credit_card_cvv': '672',
-    })
+    }, cookies=l.cookies)
 
 def emptyCart(l):
     addToCart(l)
@@ -71,6 +86,7 @@ def emptyCart(l):
 class UserBehavior(TaskSet):
 
     def on_start(self):
+        self.cookies = None
         index(self)
 
     tasks = {index: 1,
