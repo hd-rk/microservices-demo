@@ -17,20 +17,15 @@
 import random
 from locust import HttpUser, TaskSet, between
 import logging
-
-products = [
-    '6420eb66767b30fe05a3f2e1',
-    '6420eb66767b30fe05a3f2e3',
-    '6420eb66767b30fe05a3f2db',
-    '6420eb66767b30fe05a3f2dd',
-    '6420eb66767b30fe05a3f2dc',
-    '6420eb66767b30fe05a3f2df',
-    '6420eb66767b30fe05a3f2e2',
-    '6420eb66767b30fe05a3f2de',
-    '6420eb66767b30fe05a3f2e0']
+import os
 
 
+products = []
 
+with open(os.environ.get('PRODUCT_ID_FILENAME'), 'r') as file:
+    for line in file:
+        products.append(line.strip())
+    
 def index(l):
     response = l.client.get("/")
     if l.cookies is None:

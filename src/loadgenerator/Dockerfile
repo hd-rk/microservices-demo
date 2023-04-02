@@ -28,8 +28,11 @@ COPY --from=builder /install /usr/local
 
 # Add application code.
 COPY locustfile.py .
+COPY product_ids_serverless.csv .
+COPY product_ids.csv .
 
 # enable gevent support in debugger
 ENV GEVENT_SUPPORT=True
+ENV PRODUCT_ID_FILENAME=product_ids_serverless.csv
 
 ENTRYPOINT locust --host="http://${FRONTEND_ADDR}" --headless -u "${USERS:-10}" 2>&1

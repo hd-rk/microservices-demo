@@ -67,7 +67,7 @@ spec:
               - ALL
           privileged: false
           readOnlyRootFilesystem: true
-        image: gcr.io/google-samples/microservices-demo/loadgenerator:v0.5.2
+        image: gcr.io/cmpt-756-serverful/demo/loadgenerator@sha256:ba3c8745ecd816b52e7bcffb79b133949e115fb6b883c5866f11003cbea00483
         env:
         - name: FRONTEND_ADDR
           value: "frontend:80"
