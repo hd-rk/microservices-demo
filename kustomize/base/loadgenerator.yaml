@@ -67,12 +67,14 @@ spec:
               - ALL
           privileged: false
           readOnlyRootFilesystem: true
-        image: gcr.io/cmpt-756-serverful/demo/loadgenerator@sha256:ba3c8745ecd816b52e7bcffb79b133949e115fb6b883c5866f11003cbea00483
+        image: gcr.io/cmpt-756-serverful/demo/loadgenerator@sha256:41c903373e6e6648ececdbfe264d9da254586accc324c626c0d672408a2195bb
         env:
         - name: FRONTEND_ADDR
           value: "frontend:80"
         - name: USERS
           value: "10"
+        - name: PRODUCT_ID_FILENAME
+          value: "product_ids.csv"
         resources:
           requests:
             cpu: 300m
