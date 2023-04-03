@@ -19,7 +19,7 @@ spec:
   selector:
     matchLabels:
       app: loadgenerator
-  replicas: 0
+  replicas: 1
   template:
     metadata:
       labels:
