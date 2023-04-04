@@ -55,7 +55,7 @@ def addToCart(l):
     l.client.post("/cart", 
         {
             'product_id': product,
-            'quantity': random.choice([1,2,3,4,5,10])
+            'quantity': 1
         },
         cookies=l.cookies)
 
