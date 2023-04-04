@@ -82,6 +82,7 @@ class RecommendationService(demo_pb2_grpc.RecommendationServiceServicer):
         # self.cache_thread = threading.Thread(target=self.update_cache)
         # self.cache_thread.daemon = True
         # self.cache_thread.start()
+        # docker run --network=mongonet -e MONGO_CONNECTION_URL=mongodb://my-mongo:27017 -e PRODUCT_CATALOG_SERVICE_ADDR=34.69.33.183:3550 -p 8080:8080 recommendation
 
     def update_cache(self):
         # fetch list of products from product catalog stub

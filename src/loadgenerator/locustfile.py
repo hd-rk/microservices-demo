@@ -30,17 +30,17 @@ def index(l):
     response = l.client.get("/")
     if l.cookies is None:
         l.cookies = response.cookies
-    logging.info(f"loading landing page with cookie: {l.cookies['shop_session-id']}")
+    # logging.info(f"loading landing page with cookie: {l.cookies['shop_session-id']}")
 
 def setCurrency(l):
-    logging.info(f"loading setCurrenct page with cookie: {l.cookies['shop_session-id']}")
+    # logging.info(f"loading setCurrenct page with cookie: {l.cookies['shop_session-id']}")
     currencies = ['EUR', 'USD', 'JPY', 'CAD', 'GBP', 'TRY']
     l.client.post("/setCurrency",
         {'currency_code': random.choice(currencies)},
         cookies=l.cookies)
 
 def browseProduct(l):
-    logging.info(f"loading product page with cookie: {l.cookies['shop_session-id']}")
+    # logging.info(f"loading product page with cookie: {l.cookies['shop_session-id']}")
     l.client.get("/product/" + random.choice(products),
         cookies=l.cookies)
 
@@ -74,6 +74,10 @@ def checkout(l):
         'credit_card_cvv': '672',
     }, cookies=l.cookies)
 
+def emptyCart(l):
+    addToCart(l)
+    l.client.post("/cart/empty", cookies=l.cookies)
+
 class UserBehavior(TaskSet):
 
     def on_start(self):
@@ -85,7 +89,8 @@ class UserBehavior(TaskSet):
         browseProduct: 10,
         addToCart: 2,
         viewCart: 3,
-        checkout: 1}
+        checkout: 1,
+        emptyCart: 1}
 
 class WebsiteUser(HttpUser):
     tasks = [UserBehavior]
