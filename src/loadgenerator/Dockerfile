@@ -35,4 +35,4 @@ COPY product_ids.csv .
 ENV GEVENT_SUPPORT=True
 ENV PRODUCT_ID_FILENAME=product_ids_serverless.csv
 
-ENTRYPOINT locust --host="http://${FRONTEND_ADDR}" --headless -u "${USERS:-10}" 2>&1
+ENTRYPOINT locust --host="${FRONTEND_ADDR}" --headless -u "${USERS:-10}" 2>&1

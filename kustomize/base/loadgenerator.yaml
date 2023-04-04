@@ -19,7 +19,7 @@ spec:
   selector:
     matchLabels:
       app: loadgenerator
-  replicas: 1
+  replicas: 0
   template:
     metadata:
       labels:
@@ -67,7 +67,7 @@ spec:
               - ALL
           privileged: false
           readOnlyRootFilesystem: true
-        image: gcr.io/cmpt-756-serverful/demo/loadgenerator@sha256:41c903373e6e6648ececdbfe264d9da254586accc324c626c0d672408a2195bb
+        image: gcr.io/cmpt-756-serverful/demo/loadgenerator@sha256:0500372e98ebcf51544b4fa999fc6b2e280197af267b0038deb505f46cefcc8e
         env:
         - name: FRONTEND_ADDR
           value: "frontend:80"
